@@ -4,7 +4,7 @@ from typing import Any
 import pygame
 
 import settings
-from ui import ImageButton
+from ui import ImageButton, ShortcutButton
 
 
 class Application:
@@ -14,8 +14,8 @@ class Application:
         self.__running = True
         self.__screen = pygame.display.set_mode(size, flags)
 
-        self.__controlbar = ControlBar(self, (size[0], 48), "#404040")
-        self.__viewport = ViewPort(self, (0, 48), size)
+        self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), "#404040")
+        self.__viewport = ViewPort(self, (0, settings.control_bar_size), size)
 
     def loop(self):
         while self.__running:
@@ -37,10 +37,10 @@ class Application:
     def __resize(self, size: list[int, int]):
 
         w = size[0]
-        h = max(size[0] - 48, 0)
+        h = max(size[0] - settings.control_bar_size, 0)
         self.__size = size
 
-        self.__controlbar.resize((w, 48))
+        self.__controlbar.resize((w, settings.control_bar_size))
         self.__viewport.resize((w, h))
         print(f"Resized to {size[0]} x {size[1]}")
 
@@ -164,13 +164,40 @@ class ControlBar:
         self.__application = application
         self.__color = color
         self.__w, self.__h = size
-        self.__close_button = ImageButton((self.__w - 40, 8), (32, 32),
+        self.__close_button = ImageButton((self.__w - 40, (settings.control_bar_size - 32) / 2), (32, 32),
                                           os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                        "../ressources/close.png"), self.__application.quit)
 
+        # int(text): (index, text, image_name)
+        self.__shortcuts_properties = {
+            1: (0, "1", "conveyor.png"),
+            2: (1, "2", "splitter.png"),
+            3: (2, "3", "merger.png"),
+            4: (3, "4", "smelter.png"),
+            5: (4, "5", "foundry.png"),
+            6: (5, "6", "refinery.png"),
+            7: (6, "7", "constructor.png"),
+            8: (7, "8", "assembler.png"),
+            9: (8, "9", "manufacturer.png"),
+            0: (9, "0", "container.png"),
+        }
+
+        self.__buttons = [
+            ShortcutButton((4 + i * 52, 4), (48, 48),
+                           os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ressources/shortcuts/" + n),
+                           t, lambda _: 0, "#202020", "#a0a0a0"
+                           )
+            for i, t, n in self.__shortcuts_properties.values()
+        ]
+
     def render(self, surface: pygame.Surface):
         pygame.draw.rect(surface, self.__color, pygame.Rect(0, 0, self.__w, self.__h))
+        for button in self.__buttons:
+            button.render(surface)
         self.__close_button.render(surface)
+
+    def press_shortcut_button(self):
+        pass
 
     def process_event(self, events):
         for event in events:
@@ -178,6 +205,21 @@ class ControlBar:
                 if event.button == 1:
                     self.__close_button.try_press(event)
 
+                    for i, button in enumerate(self.__buttons):
+                        if button.try_press(event, False):
+                            self.__shortcut_used(button)
+
+            elif event.type == pygame.KEYDOWN:
+                print(event.key)
+                if event.key - 48 in range(10):
+                    print(event.key - 48)
+                    self.__shortcut_used(self.__buttons[self.__shortcuts_properties[event.key - 48][0]])
+
+    def __shortcut_used(self, button):
+        for b in self.__buttons:
+            b.loose_focus()
+        button.set_focus()
+
     def resize(self, size: tuple[int, int]):
         self.__w, self.__h = size
-        self.__close_button.move_to(self.__w - 40, 8)
+        self.__close_button.move_to(self.__w - 40, (settings.control_bar_size - 32) / 2)
