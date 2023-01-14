@@ -1,6 +1,7 @@
 import pygame
 
 import settings
+from ui import ImageButton
 from pygame.surface import Surface
 
 
@@ -8,8 +9,7 @@ class Application:
 
     def __init__(self, size):
         self.__running = True
-        self.__screen = pygame.display.set_mode(size, flags=pygame.RESIZABLE)
-
+        self.__screen = pygame.display.set_mode(size, flags=pygame.RESIZABLE | pygame.FULLSCREEN)
         self.__viewport = ViewPort(self, (0, 0), size)
 
     def loop(self):
@@ -29,6 +29,9 @@ class Application:
         self.__screen.fill((0, 0, 0))
         self.__viewport.render(self.__screen)
         pygame.display.flip()
+
+    def quit(self):
+        self.__running = False
 
 
 class ViewPort:
@@ -67,6 +70,7 @@ class ViewPort:
         for event in events:
             if event.type == pygame.VIDEORESIZE:
                 self.__resize(event.size)
+                print(event.size)
 
             elif event.type == pygame.MOUSEMOTION:
                 if event.buttons[1]:
@@ -109,8 +113,6 @@ class ViewPort:
 
         if self.__show_grid:
             self.__draw_grid()
-
-        pygame.draw.rect(self.__surface, "#a06000", pygame.Rect(*self.transform(1, 1, 5, 10)))
 
         surface.blit(self.__surface, self.__pos)
 
