@@ -30,6 +30,10 @@ class Button:
         else:
             return False
 
+    def move_to(self, x: int, y: int):
+        self.__x = x
+        self.__y = y
+
     @property
     def pos(self) -> list[int, int]:
         return [self.__x, self.__y]

@@ -1,16 +1,21 @@
+import os.path
+from typing import Any
+
 import pygame
 
 import settings
 from ui import ImageButton
-from pygame.surface import Surface
 
 
 class Application:
 
-    def __init__(self, size):
+    def __init__(self, size, flags):
+        self.__size = size
         self.__running = True
-        self.__screen = pygame.display.set_mode(size, flags=pygame.RESIZABLE | pygame.FULLSCREEN)
-        self.__viewport = ViewPort(self, (0, 0), size)
+        self.__screen = pygame.display.set_mode(size, flags)
+
+        self.__controlbar = ControlBar(self, (size[0], 48), "#404040")
+        self.__viewport = ViewPort(self, (0, 48), size)
 
     def loop(self):
         while self.__running:
@@ -23,10 +28,25 @@ class Application:
             if event.type == pygame.QUIT:
                 self.__running = False
 
+            if event.type == pygame.VIDEORESIZE:
+                self.__resize(event.size)
+
+        self.__controlbar.process_event(events)
         self.__viewport.process_events(events)
+
+    def __resize(self, size: list[int, int]):
+
+        w = size[0]
+        h = max(size[0] - 48, 0)
+        self.__size = size
+
+        self.__controlbar.resize((w, 48))
+        self.__viewport.resize((w, h))
+        print(f"Resized to {size[0]} x {size[1]}")
 
     def render(self):
         self.__screen.fill((0, 0, 0))
+        self.__controlbar.render(self.__screen)
         self.__viewport.render(self.__screen)
         pygame.display.flip()
 
@@ -45,7 +65,7 @@ class ViewPort:
         self.__application = application
         self.__pos = pos
         self.__size = size
-        self.__surface = Surface(size)
+        self.__surface = pygame.Surface(size)
         self.__x_offset, self.__y_offset = 0, 0
         self.__resolution = 16                      # px / m
         self.__show_grid = True
@@ -68,11 +88,7 @@ class ViewPort:
 
     def process_events(self, events: list[pygame.event.Event]):
         for event in events:
-            if event.type == pygame.VIDEORESIZE:
-                self.__resize(event.size)
-                print(event.size)
-
-            elif event.type == pygame.MOUSEMOTION:
+            if event.type == pygame.MOUSEMOTION:
                 if event.buttons[1]:
                     self.__pan(event.rel)
 
@@ -83,9 +99,8 @@ class ViewPort:
                 if event.key == pygame.K_g:
                     self.__show_grid = not self.__show_grid
 
-    def __resize(self, size: tuple[int, int]):
+    def resize(self, size: tuple[int, int]):
         self.__size = size
-        print(size)
         self.__surface = pygame.transform.scale(self.__surface, size)
 
     def __pan(self, rel: tuple[int, int]):
@@ -108,7 +123,7 @@ class ViewPort:
         self.__x_offset = int(xoff) + pos[0]
         self.__y_offset = int(yoff) + pos[1]
 
-    def render(self, surface: Surface):
+    def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
 
         if self.__show_grid:
@@ -141,3 +156,28 @@ class ViewPort:
                 1 + y * self.__resolution + self.__y_offset,
                 w * self.__resolution - 1,
                 h * self.__resolution - 1)
+
+
+class ControlBar:
+
+    def __init__(self, application: Application, size: tuple[int, int], color: Any):
+        self.__application = application
+        self.__color = color
+        self.__w, self.__h = size
+        self.__close_button = ImageButton((self.__w - 40, 8), (32, 32),
+                                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                       "../ressources/close.png"), self.__application.quit)
+
+    def render(self, surface: pygame.Surface):
+        pygame.draw.rect(surface, self.__color, pygame.Rect(0, 0, self.__w, self.__h))
+        self.__close_button.render(surface)
+
+    def process_event(self, events):
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    self.__close_button.try_press(event)
+
+    def resize(self, size: tuple[int, int]):
+        self.__w, self.__h = size
+        self.__close_button.move_to(self.__w - 40, 8)
