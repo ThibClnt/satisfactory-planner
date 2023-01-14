@@ -3,6 +3,6 @@ from app import Application
 
 pygame.init()
 
-Application((540, 540)).loop()
+Application((0, 0)).loop()
 
 pygame.quit()
