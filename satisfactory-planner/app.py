@@ -168,18 +168,18 @@ class ControlBar:
                                           os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                                        "../ressources/close.png"), self.__application.quit)
 
-        # key: (index, text, image_name)
+        # int(text): (index, text, image_name)
         self.__shortcuts_properties = {
-            pygame.K_1: (0, "1", "conveyor.png"),
-            pygame.K_2: (1, "2", "splitter.png"),
-            pygame.K_3: (2, "3", "merger.png"),
-            pygame.K_4: (3, "4", "smelter.png"),
-            pygame.K_5: (4, "5", "foundry.png"),
-            pygame.K_6: (5, "6", "refinery.png"),
-            pygame.K_7: (6, "7", "constructor.png"),
-            pygame.K_8: (7, "8", "assembler.png"),
-            pygame.K_9: (8, "9", "manufacturer.png"),
-            pygame.K_0: (9, "0", "container.png"),
+            1: (0, "1", "conveyor.png"),
+            2: (1, "2", "splitter.png"),
+            3: (2, "3", "merger.png"),
+            4: (3, "4", "smelter.png"),
+            5: (4, "5", "foundry.png"),
+            6: (5, "6", "refinery.png"),
+            7: (6, "7", "constructor.png"),
+            8: (7, "8", "assembler.png"),
+            9: (8, "9", "manufacturer.png"),
+            0: (9, "0", "container.png"),
         }
 
         self.__buttons = [
@@ -204,6 +204,21 @@ class ControlBar:
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     self.__close_button.try_press(event)
+
+                    for i, button in enumerate(self.__buttons):
+                        if button.try_press(event, False):
+                            self.__shortcut_used(button)
+
+            elif event.type == pygame.KEYDOWN:
+                print(event.key)
+                if event.key - 48 in range(10):
+                    print(event.key - 48)
+                    self.__shortcut_used(self.__buttons[self.__shortcuts_properties[event.key - 48][0]])
+
+    def __shortcut_used(self, button):
+        for b in self.__buttons:
+            b.loose_focus()
+        button.set_focus()
 
     def resize(self, size: tuple[int, int]):
         self.__w, self.__h = size
