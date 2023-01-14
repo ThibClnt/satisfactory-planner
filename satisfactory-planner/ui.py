@@ -18,16 +18,16 @@ class Button:
         self.border_radius = border_radius
         self.__args = args
 
-        self.draw()
+        Button.draw(self)
 
     def draw(self):
         self.__surface.fill(pygame.color.Color(0, 0, 0, 0))
 
         if self.color is not None:
-            pygame.draw.rect(self.__surface, self.color, pygame.Rect((0, 0), *self.size), border_radius=self.border_radius)
+            pygame.draw.rect(self.__surface, self.color, pygame.Rect(0, 0, *self.size), border_radius=self.border_radius)
 
         if self.border_width != 0 and self.border_color is not None:
-            pygame.draw.rect(self.__surface, self.border_color, pygame.Rect((0, 0), *self.size), width=self.border_width, border_radius=self.border_radius)
+            pygame.draw.rect(self.__surface, self.border_color, pygame.Rect(0, 0, *self.size), width=self.border_width, border_radius=self.border_radius)
 
     def render(self, surface: pygame.Surface):
         surface.blit(self.__surface, self.pos)
@@ -41,7 +41,8 @@ class Button:
             return False
 
     def do_action(self):
-        self.__action(*self.__args)
+        if self.__action is not None:
+            self.__action(*self.__args)
 
     def move_to(self, x: int, y: int):
         self.__x = x
@@ -94,7 +95,7 @@ class ImageButton(Button):
         self.draw()
 
     def draw(self):
-        super(ImageButton, self).draw()
+        super().draw()
         self.surface.blit(pygame.transform.smoothscale(pygame.image.load(self.__image_path), self.size).convert_alpha(), (0, 0))
 
 
@@ -119,7 +120,7 @@ class ShortcutButton(Button):
         self.draw()
 
     def draw(self):
-        super(ShortcutButton, self).draw()
+        super().draw()
         self.surface.blit(pygame.transform.smoothscale(pygame.image.load(self.__image_path),
                                                        (self.size[0] - 2 * self.margin, self.size[1] - 2 * self.margin)
                                                        ).convert_alpha(), (self.margin, self.margin))
