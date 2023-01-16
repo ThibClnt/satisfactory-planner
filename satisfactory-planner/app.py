@@ -1,10 +1,12 @@
 import os.path
 from typing import Any
+import json
 
 import pygame
 
 import settings
 from ui import ImageButton, ShortcutButton
+from buildings import BuildingInfo
 
 
 class Mode:
@@ -112,23 +114,21 @@ class ViewPort:
         self.__show_floor = True
         self.__show_grid = True
 
-        self.__images = {
-            name: pygame.image.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                 "../ressources/top/" + name + ".png"))
-            for name in (
-                "assembler", "constructor", "container", "conveyor-l-shaped", "conveyor",
-                "conveyor-wave-left", "conveyor-wave-right", "floor", "foundry", "manufacturer",
-                "merger", "refinery", "smelter", "splitter"
-            )
-        }
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/buildings.json"), 'r') as file:
+            building_infos = json.load(file)["buildings"]
+            self.__buildings: dict[str, BuildingInfo] = {
+                building["name"]: BuildingInfo(
+                    building["name"],
+                    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "../ressources/top/" + building["name"] + ".png"),
+                    building["size"]
+                )
+                for building in building_infos
+            }
 
         # base image resolution = 64 px / m
-        scale_factor = self.__resolution / 64
-        self.__rendered_images = {
-            name: pygame.transform.smoothscale(image, (
-                image.get_width() * scale_factor, image.get_height() * scale_factor)).convert_alpha()
-            for name, image in self.__images.items()
-        }
+        self.__rendered_images = dict()
+        self.resolution = self.__resolution     # Will render the images with the right scale
 
     @property
     def application(self):
@@ -148,15 +148,10 @@ class ViewPort:
 
     @resolution.setter
     def resolution(self, r: int):
-        # Image scale is 64 px / m
-
-        scale_factor = r / 64
         self.__rendered_images = {
-            name: pygame.transform.smoothscale(image, (
-                image.get_width() * scale_factor, image.get_height() * scale_factor)).convert()
-            for name, image in self.__images.items()
+            building.name: building.get_scaled_image(r)
+            for building in self.__buildings.values()
         }
-
         self.__resolution = r
 
     def process_events(self, events: list[pygame.event.Event]):
