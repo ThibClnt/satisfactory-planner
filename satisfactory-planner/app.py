@@ -123,8 +123,11 @@ class ViewPort:
                 self.__zoom(event.y, pygame.mouse.get_pos())
 
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_g:
+                if event.key == pygame.K_g:     # show/hide grid
                     self.__show_grid = not self.__show_grid
+
+                elif event.key == pygame.K_f:   # show/hide floor
+                    self.__show_floor = not self.__show_floor
 
     def resize(self, size: tuple[int, int]):
         self.__size = size
