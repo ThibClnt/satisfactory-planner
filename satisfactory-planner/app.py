@@ -252,9 +252,7 @@ class ControlBar:
                             self.__shortcut_used(button)
 
             elif event.type == pygame.KEYDOWN:
-                print(event.key)
                 if event.key - 48 in range(10):
-                    print(event.key - 48)
                     self.__shortcut_used(self.__buttons[self.__shortcuts_properties[event.key - 48][0]])
 
     def __shortcut_used(self, button):
