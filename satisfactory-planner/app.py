@@ -87,9 +87,11 @@ class ViewPort:
         return self.__resolution
 
     def process_events(self, events: list[pygame.event.Event]):
+        keys_pressed = pygame.key.get_pressed()
+
         for event in events:
             if event.type == pygame.MOUSEMOTION:
-                if event.buttons[1]:
+                if event.buttons[1] or (event.buttons[0] and keys_pressed[pygame.K_LSHIFT]):
                     self.__pan(event.rel)
 
             elif event.type == pygame.MOUSEWHEEL:
