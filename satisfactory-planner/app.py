@@ -67,8 +67,21 @@ class ViewPort:
         self.__size = size
         self.__surface = pygame.Surface(size)
         self.__x_offset, self.__y_offset = 0, 0
-        self.__resolution = 16                      # px / m
+        self.__resolution = 16  # px / m
+        self.__show_floor = True
         self.__show_grid = True
+
+        self.__images = {
+            "floor": pygame.image.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    "../ressources/top/floor.png"))
+        }
+
+        # base image resolution = 64 px / m
+        scale_factor = self.__resolution / 64
+        self.__rendered_images = {
+            name: pygame.transform.smoothscale(image, (image.get_width() * scale_factor, image.get_height() * scale_factor)).convert()
+            for name, image in self.__images.items()
+        }
 
     @property
     def application(self):
@@ -86,6 +99,18 @@ class ViewPort:
     def resolution(self) -> int:
         return self.__resolution
 
+    @resolution.setter
+    def resolution(self, r: int):
+        # Image scale is 64 px / m
+
+        scale_factor = r / 64
+        self.__rendered_images = {
+            name: pygame.transform.smoothscale(image, (image.get_width() * scale_factor, image.get_height() * scale_factor)).convert()
+            for name, image in self.__images.items()
+        }
+
+        self.__resolution = r
+
     def process_events(self, events: list[pygame.event.Event]):
         keys_pressed = pygame.key.get_pressed()
 
@@ -98,8 +123,11 @@ class ViewPort:
                 self.__zoom(event.y, pygame.mouse.get_pos())
 
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_g:
+                if event.key == pygame.K_g:     # show/hide grid
                     self.__show_grid = not self.__show_grid
+
+                elif event.key == pygame.K_f:   # show/hide floor
+                    self.__show_floor = not self.__show_floor
 
     def resize(self, size: tuple[int, int]):
         self.__size = size
@@ -114,11 +142,11 @@ class ViewPort:
         yoff = self.__y_offset - pos[1]
 
         if amount > 0 and self.resolution < 64:
-            self.__resolution *= 2
+            self.resolution *= 2
             xoff *= 2
             yoff *= 2
         elif amount < 0 and self.resolution > 4:
-            self.__resolution = self.resolution // 2
+            self.resolution = self.resolution // 2
             xoff /= 2
             yoff /= 2
 
@@ -128,21 +156,33 @@ class ViewPort:
     def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
 
+        if self.__show_floor:
+            self.__draw_floor()
+
         if self.__show_grid:
             self.__draw_grid()
 
         surface.blit(self.__surface, self.__pos)
 
+    def __draw_floor(self):
+        floor: pygame.Surface = self.__rendered_images["floor"]
+        w, h = floor.get_width(), floor.get_height()        # image
+        width, height = self.__size[0], self.__size[1]      # viewport
+        mod_xoffset, mod_yoffset = self.__x_offset % w - w, self.__y_offset % h - h
+
+        for x in range(mod_xoffset, width + 1, w):
+            for y in range(mod_yoffset, height + 1, h):
+                self.__surface.blit(floor, (x, y))
+
     def __draw_grid(self):
         mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
         width, height = self.__size[0], self.__size[1]
-        for i in range(width // self.__resolution + 1):
-            x = mod_xoffset + i * self.__resolution
+
+        for x in range(mod_xoffset, width + 1, self.__resolution):
             pygame.draw.line(self.__surface, settings.grid_color, (x, mod_yoffset - self.__resolution),
                              (x, mod_yoffset + height))
 
-        for i in range(height // self.__resolution + 1):
-            y = mod_yoffset + i * self.__resolution
+        for y in range(mod_yoffset, height + 1, self.__resolution):
             pygame.draw.line(self.__surface, settings.grid_color, (mod_xoffset - self.__resolution, y),
                              (mod_xoffset + width, y))
 
@@ -212,9 +252,7 @@ class ControlBar:
                             self.__shortcut_used(button)
 
             elif event.type == pygame.KEYDOWN:
-                print(event.key)
                 if event.key - 48 in range(10):
-                    print(event.key - 48)
                     self.__shortcut_used(self.__buttons[self.__shortcuts_properties[event.key - 48][0]])
 
     def __shortcut_used(self, button):
