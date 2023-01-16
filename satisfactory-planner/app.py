@@ -162,18 +162,24 @@ class ViewPort:
         surface.blit(self.__surface, self.__pos)
 
     def __draw_floor(self):
-        self.__surface.blit(self.__rendered_images["floor"], (0, 0))
+        floor: pygame.Surface = self.__rendered_images["floor"]
+        w, h = floor.get_width(), floor.get_height()        # image
+        width, height = self.__size[0], self.__size[1]      # viewport
+        mod_xoffset, mod_yoffset = self.__x_offset % w - w, self.__y_offset % h - h
+
+        for x in range(mod_xoffset, width + 1, w):
+            for y in range(mod_yoffset, height + 1, h):
+                self.__surface.blit(floor, (x, y))
 
     def __draw_grid(self):
         mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
         width, height = self.__size[0], self.__size[1]
-        for i in range(width // self.__resolution + 1):
-            x = mod_xoffset + i * self.__resolution
+
+        for x in range(mod_xoffset, width + 1, self.__resolution):
             pygame.draw.line(self.__surface, settings.grid_color, (x, mod_yoffset - self.__resolution),
                              (x, mod_yoffset + height))
 
-        for i in range(height // self.__resolution + 1):
-            y = mod_yoffset + i * self.__resolution
+        for y in range(mod_yoffset, height + 1, self.__resolution):
             pygame.draw.line(self.__surface, settings.grid_color, (mod_xoffset - self.__resolution, y),
                              (mod_xoffset + width, y))
 
