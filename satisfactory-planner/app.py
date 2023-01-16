@@ -67,8 +67,21 @@ class ViewPort:
         self.__size = size
         self.__surface = pygame.Surface(size)
         self.__x_offset, self.__y_offset = 0, 0
-        self.__resolution = 16                      # px / m
+        self.__resolution = 16  # px / m
+        self.__show_floor = True
         self.__show_grid = True
+
+        self.__images = {
+            "floor": pygame.image.load(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                                    "../ressources/top/floor.png"))
+        }
+
+        # base image resolution = 64 px / m
+        scale_factor = self.__resolution / 64
+        self.__rendered_images = {
+            name: pygame.transform.smoothscale(image, (image.get_width() * scale_factor, image.get_height() * scale_factor)).convert()
+            for name, image in self.__images.items()
+        }
 
     @property
     def application(self):
@@ -85,6 +98,18 @@ class ViewPort:
     @property
     def resolution(self) -> int:
         return self.__resolution
+
+    @resolution.setter
+    def resolution(self, r: int):
+        # Image scale is 64 px / m
+
+        scale_factor = r / 64
+        self.__rendered_images = {
+            name: pygame.transform.smoothscale(image, (image.get_width() * scale_factor, image.get_height() * scale_factor)).convert()
+            for name, image in self.__images.items()
+        }
+
+        self.__resolution = r
 
     def process_events(self, events: list[pygame.event.Event]):
         keys_pressed = pygame.key.get_pressed()
@@ -114,11 +139,11 @@ class ViewPort:
         yoff = self.__y_offset - pos[1]
 
         if amount > 0 and self.resolution < 64:
-            self.__resolution *= 2
+            self.resolution *= 2
             xoff *= 2
             yoff *= 2
         elif amount < 0 and self.resolution > 4:
-            self.__resolution = self.resolution // 2
+            self.resolution = self.resolution // 2
             xoff /= 2
             yoff /= 2
 
@@ -128,10 +153,16 @@ class ViewPort:
     def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
 
+        if self.__show_floor:
+            self.__draw_floor()
+
         if self.__show_grid:
             self.__draw_grid()
 
         surface.blit(self.__surface, self.__pos)
+
+    def __draw_floor(self):
+        self.__surface.blit(self.__rendered_images["floor"], (0, 0))
 
     def __draw_grid(self):
         mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
