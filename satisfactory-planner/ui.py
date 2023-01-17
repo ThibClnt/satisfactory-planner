@@ -46,13 +46,13 @@ class Button:
         if self.__action is not None:
             self.__action(*self.__args)
 
-    def move_to(self, x: int, y: int):
-        self.__x = x
-        self.__y = y
-
     @property
     def pos(self) -> list[int, int]:
         return [self.__x, self.__y]
+
+    @pos.setter
+    def pos(self, new_pos: list[int, int]):
+        self.__x, self.__y = new_pos
 
     @property
     def size(self) -> list[int, int]:

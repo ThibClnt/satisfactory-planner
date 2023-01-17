@@ -336,8 +336,13 @@ class ControlBar:
             0: (9, "0", "container"),
         }
 
+        shortcut_button_padding = 4
+        shortcut_buttons_count = 10
+        first_shortcut_x = (self.__w - shortcut_buttons_count * (settings.shortcut_button__size + shortcut_button_padding) + shortcut_button_padding) / 2
+
         self.__buttons = [
-            ShortcutButton((4 + i * 52, 4), (settings.shortcut_button__size, settings.shortcut_button__size),
+            ShortcutButton((first_shortcut_x + i * (settings.shortcut_button__size + shortcut_button_padding), shortcut_button_padding),
+                           (settings.shortcut_button__size, settings.shortcut_button__size),
                            os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "../ressources/shortcuts/" + n + ".png"),
                            t, lambda _: 0, settings.shortcut_button_background_color, settings.shortcut_button_focus_color
@@ -381,5 +386,15 @@ class ControlBar:
             b.loose_focus()
 
     def resize(self, size: tuple[int, int]):
+        print(f"Control bar resized to {size[0]} x {size[1]}")
         self.__w, self.__h = size
-        self.__close_button.move_to(self.__w - 40, (settings.control_bar_size - 32) / 2)
+        self.__close_button.pos = (self.__w - 40, (settings.control_bar_size - 32) / 2)
+        self.__update_shortcuts_pos()
+
+    def __update_shortcuts_pos(self):
+        shortcut_button_padding = 4
+        shortcut_buttons_count = 10
+        first_shortcut_x = (self.__w - shortcut_buttons_count * (settings.shortcut_button__size + shortcut_button_padding) + shortcut_button_padding) / 2
+
+        for i, button in enumerate(self.__buttons):
+            button.pos = (first_shortcut_x + i * (settings.shortcut_button__size + shortcut_button_padding), shortcut_button_padding)
