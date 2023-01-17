@@ -18,6 +18,10 @@
       "size": [2, 2]
     },
     {
+      "name": "conveyor-reduced",
+      "size": [2, 1]
+    },
+    {
       "name": "conveyor-l-shaped",
       "size": [3, 3]
     },
