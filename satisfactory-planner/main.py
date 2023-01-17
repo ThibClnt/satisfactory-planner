@@ -1,9 +1,9 @@
 import pygame
 from app import Application
+from settings import fullscreen
 
 pygame.init()
 
-fullscreen = False
 if fullscreen:
     Application((0, 0), pygame.FULLSCREEN | pygame.RESIZABLE).loop()
 else:

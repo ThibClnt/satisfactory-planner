@@ -1,3 +1,5 @@
+fullscreen = True
+
 # Recommanded to stay between 4 and 64 px/m
 default_resolution = 16
 

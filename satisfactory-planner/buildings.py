@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pygame
 from typing import Any
 
@@ -47,12 +48,20 @@ class BuildingInfo:
 
 class Building:
 
-    def __init__(self, info: BuildingInfo, pos: tuple[int, int]):
+    def __init__(self, info: BuildingInfo, pos: tuple[int, int], angle: float = 0):
         self.__info = info
         self.__x, self.__y = pos
+        self.__angle = angle
 
     def get_scaled_image(self, resolution: int) -> pygame.Surface:
-        return self.__info.get_scaled_image(resolution)
+        return pygame.transform.rotate(self.__info.get_scaled_image(resolution), self.__angle).convert_alpha()
+
+    def rotate(self, angle: float):
+        self.__angle += angle
+
+    def copy(self) -> Building:
+        print(self.pos)
+        return Building(self.__info, self.pos, self.angle)
 
     @property
     def name(self):
@@ -61,6 +70,10 @@ class Building:
     @property
     def pos(self) -> tuple[int, int]:
         return self.__x, self.__y
+
+    @pos.setter
+    def pos(self, new_pos: tuple[int, int]):
+        self.__x, self.__y = new_pos
 
     @property
     def x(self) -> int:
@@ -83,5 +96,12 @@ class Building:
         return self.__info.w, self.__info.h
 
     @property
+    def angle(self) -> float:
+        return self.__angle
+
+    @property
     def image(self) -> pygame.Surface:
         return self.__info.image
+
+    def __str__(self):
+        return f"{'{'}name: '{self.name}', pos: {self.pos}, angle: {self.angle}{'}'}"
