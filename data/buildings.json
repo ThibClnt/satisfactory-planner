@@ -1,0 +1,61 @@
+{
+  "buildings":
+  [
+    {
+      "name": "assembler",
+      "size": [10, 15]
+    },
+    {
+      "name": "constructor",
+      "size": [8, 10]
+    },
+    {
+      "name": "container",
+      "size": [5, 10]
+    },
+    {
+      "name": "conveyor",
+      "size": [2, 2]
+    },
+    {
+      "name": "conveyor-l-shaped",
+      "size": [3, 3]
+    },
+    {
+      "name": "conveyor-wave-left",
+      "size": [4, 4]
+    },
+    {
+      "name": "conveyor-wave-right",
+      "size": [4, 4]
+    },
+    {
+      "name": "floor",
+      "size": [8, 8]
+    },
+    {
+      "name": "foundry",
+      "size": [10, 9]
+    },
+    {
+      "name": "manufacturer",
+      "size": [18, 19]
+    },
+    {
+      "name": "merger",
+      "size": [4, 4]
+    },
+    {
+      "name": "refinery",
+      "size": [10, 20]
+    },
+    {
+      "name": "smelter",
+      "size": [5, 10]
+    },
+    {
+      "name": "splitter",
+      "size": [4, 4]
+    }
+  ]
+}
