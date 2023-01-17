@@ -28,7 +28,7 @@ class Application:
 
         self.__mode = Mode.IDLE
 
-        self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), "#404040")
+        self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), settings.control_bar_color)
         self.__viewport = ViewPort(self, (0, settings.control_bar_size), size)
 
         self.__building_name: str = "conveyor"
@@ -110,7 +110,7 @@ class ViewPort:
         self.__size = size
         self.__surface = pygame.Surface(size)
         self.__x_offset, self.__y_offset = 0, 0
-        self.__resolution = 16  # px / m
+        self.__resolution = settings.default_resolution  # px / m
         self.__show_floor = True
         self.__show_grid = True
 
@@ -137,7 +137,7 @@ class ViewPort:
             building.name: building.get_scaled_image(self.__resolution)
             for building in self.__buildings_infos.values()
         }
-        self.resolution = self.__resolution     # Will render the images with the right scale
+        self.resolution = self.__resolution  # Will render the images with the right scale
 
     @property
     def application(self):
@@ -183,9 +183,9 @@ class ViewPort:
                     self.__show_floor = not self.__show_floor
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1\
-                        and self.__application.mode == Mode.BUILD\
-                        and not keys_pressed[pygame.K_LCTRL]\
+                if event.button == 1 \
+                        and self.__application.mode == Mode.BUILD \
+                        and not keys_pressed[pygame.K_LCTRL] \
                         and self.__contains_coord(event.pos):
                     self.__place_building()
 
@@ -316,9 +316,11 @@ class ControlBar:
         self.__application = application
         self.__color = color
         self.__w, self.__h = size
-        self.__close_button = ImageButton((self.__w - 40, (settings.control_bar_size - 32) / 2), (32, 32),
-                                          os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                       "../ressources/close.png"), self.__application.quit)
+        self.__close_button = ImageButton(
+            (self.__w - 40, (settings.control_bar_size - settings.close_button_size) / 2),
+            (settings.close_button_size, settings.close_button_size),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "../ressources/close.png"), self.__application.quit)
 
         # int(text): (index, text, name)
         self.__shortcuts_properties = {
@@ -335,10 +337,10 @@ class ControlBar:
         }
 
         self.__buttons = [
-            ShortcutButton((4 + i * 52, 4), (48, 48),
+            ShortcutButton((4 + i * 52, 4), (settings.shortcut_button__size, settings.shortcut_button__size),
                            os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                         "../ressources/shortcuts/" + n + ".png"),
-                           t, lambda _: 0, "#202020", "#a0a0a0"
+                           t, lambda _: 0, settings.shortcut_button_background_color, settings.shortcut_button_focus_color
                            )
             for i, t, n in self.__shortcuts_properties.values()
         ]
