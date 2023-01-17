@@ -3,6 +3,8 @@ import os
 import pygame
 from typing import Callable, Any
 
+import settings
+
 
 class Button:
 
@@ -44,13 +46,13 @@ class Button:
         if self.__action is not None:
             self.__action(*self.__args)
 
-    def move_to(self, x: int, y: int):
-        self.__x = x
-        self.__y = y
-
     @property
     def pos(self) -> list[int, int]:
         return [self.__x, self.__y]
+
+    @pos.setter
+    def pos(self, new_pos: list[int, int]):
+        self.__x, self.__y = new_pos
 
     @property
     def size(self) -> list[int, int]:
@@ -107,9 +109,9 @@ class ShortcutButton(Button):
     if not pygame.font.get_init():
         pygame.font.get_init()
 
-    font_size = 12
+    font_size = settings.shortcut_button_font_size
     margin = 4
-    font = pygame.font.Font(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ressources/fonts/Satisfontory_v1.5.ttf"), 12)
+    font = pygame.font.Font(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ressources/fonts/Satisfontory_v1.5.ttf"), font_size)
 
     def __init__(self, pos: tuple[int, int], size: tuple[int, int], image_path: Any, text: str, action: Callable,
                  color: Any = None, border_color: Any = None, border_width: int = 0, border_radius: int = -1, *args):
@@ -124,7 +126,7 @@ class ShortcutButton(Button):
         self.surface.blit(pygame.transform.smoothscale(pygame.image.load(self.__image_path),
                                                        (self.size[0] - 2 * self.margin, self.size[1] - 2 * self.margin)
                                                        ).convert_alpha(), (self.margin, self.margin))
-        self.surface.blit(self.font.render(self.__text, True, "#ffffff"),
+        self.surface.blit(self.font.render(self.__text, True, settings.shortcut_button_font_color),
                           (self.size[0] - self.font_size, self.size[1] - self.font_size - self.margin))
 
     def set_focus(self):
