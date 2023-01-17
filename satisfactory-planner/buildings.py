@@ -48,7 +48,7 @@ class BuildingInfo:
 
 class Building:
 
-    def __init__(self, info: BuildingInfo, pos: tuple[int, int], angle: float = 0):
+    def __init__(self, info: BuildingInfo, pos: tuple[int, int], angle: int = 0):
         self.__info = info
         self.__x, self.__y = pos
         self.__angle = angle
@@ -56,7 +56,7 @@ class Building:
     def get_scaled_image(self, resolution: int) -> pygame.Surface:
         return pygame.transform.rotate(self.__info.get_scaled_image(resolution), self.__angle).convert_alpha()
 
-    def rotate(self, angle: float):
+    def rotate(self, angle: int):
         self.__angle += angle
 
     def copy(self) -> Building:
@@ -96,8 +96,8 @@ class Building:
         return self.__info.w, self.__info.h
 
     @property
-    def angle(self) -> float:
-        return self.__angle
+    def angle(self) -> int:
+        return int(self.__angle)
 
     @property
     def image(self) -> pygame.Surface:

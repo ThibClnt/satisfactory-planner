@@ -109,12 +109,11 @@ class ViewPort:
 
         self.__buildings: list[Building] = []
         self.__buildings_infos: dict[str, BuildingInfo] = dict()
-        self.__scaled_building_images: dict[str, pygame.Surface] = dict()
+        self.__scaled_building_images: dict[str, list[pygame.Surface]] = dict()
         self.__load_buildings()
 
         # Image of the selected building when placing
         self.__selected_building_overlay: Building = Building(self.__buildings_infos["conveyor"], (0, 0))
-        self.__building_overlay_image = self.__selected_building_overlay.get_scaled_image(self.__resolution)
 
     def __load_buildings(self):
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/buildings.json"), 'r') as file:
@@ -128,9 +127,14 @@ class ViewPort:
                 )
                 for building in building_infos
             }
+        self.__rescale_building_images()
 
+    def __rescale_building_images(self):
         self.__scaled_building_images = {
-            building.name: building.get_scaled_image(self.__resolution)
+            building.name: [
+                pygame.transform.rotate(building.get_scaled_image(self.__resolution), angle)
+                for angle in range(0, 360, 90)
+            ]
             for building in self.__buildings_infos.values()
         }
 
@@ -153,12 +157,7 @@ class ViewPort:
     @resolution.setter
     def resolution(self, r: int):
         self.__resolution = r
-
-        self.__scaled_building_images = {
-            building.name: building.get_scaled_image(self.__resolution)
-            for building in self.__buildings_infos.values()
-        }
-        self.__building_overlay_image = self.__selected_building_overlay.get_scaled_image(self.__resolution)
+        self.__rescale_building_images()
 
     @property
     def selected_building_name(self) -> str:
@@ -168,7 +167,6 @@ class ViewPort:
     def selected_building_name(self, building_name: str):
         angle = self.__selected_building_overlay.angle
         self.__selected_building_overlay = Building(self.__buildings_infos[building_name], (0, 0), angle)
-        self.__building_overlay_image = self.__selected_building_overlay.get_scaled_image(self.__resolution)
         print(f"Selected building set to {self.__selected_building_overlay}")
 
     def process_events(self, events: list[pygame.event.Event]):
@@ -249,7 +247,7 @@ class ViewPort:
         surface.blit(self.__surface, self.__pos)
 
     def __draw_floor(self):
-        floor: pygame.Surface = self.__scaled_building_images["floor"]
+        floor: pygame.Surface = self.__scaled_building_images["floor"][0]
         w, h = floor.get_width(), floor.get_height()  # image
         width, height = self.__size[0], self.__size[1]  # viewport
         mod_xoffset, mod_yoffset = self.__x_offset % w - w, self.__y_offset % h - h
@@ -261,9 +259,7 @@ class ViewPort:
     def __draw_buildings(self):
         for building in self.__buildings:
             pos = self.meter_to_px(*building.pos)[:2]
-            self.__surface.blit(pygame.transform.rotate(
-                self.__scaled_building_images[building.name], building.angle
-            ).convert_alpha(), pos)
+            self.__surface.blit(self.__scaled_building_images[building.name][(building.angle % 360) // 90].convert_alpha(), pos)
 
     def __draw_grid(self):
         mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
@@ -279,7 +275,7 @@ class ViewPort:
 
     def __draw_selected_building(self):
         aligned_pos = self.meter_to_px(*self.px_to_meter(*self.__get_mouse_coord()))[:2]
-        self.__surface.blit(self.__building_overlay_image, aligned_pos)
+        self.__surface.blit(self.__scaled_building_images[self.__selected_building_overlay.name][(self.__selected_building_overlay.angle % 360) // 90], aligned_pos)
 
     @staticmethod
     def __get_mouse_coord() -> tuple[int, int]:
