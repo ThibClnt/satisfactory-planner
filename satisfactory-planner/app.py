@@ -6,7 +6,7 @@ import pygame
 
 import settings
 from ui import ImageButton, ShortcutButton
-from buildings import BuildingInfo
+from buildings import BuildingInfo, Building
 
 
 class Mode:
@@ -114,9 +114,16 @@ class ViewPort:
         self.__show_floor = True
         self.__show_grid = True
 
+        self.__buildings: list[Building] = []
+        self.__buildings_infos: dict[str, BuildingInfo] = dict()
+        self.__scaled_building_images: dict[str, pygame.Surface] = dict()
+
+        self.__load_buildings()
+
+    def __load_buildings(self):
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/buildings.json"), 'r') as file:
             building_infos = json.load(file)["buildings"]
-            self.__buildings: dict[str, BuildingInfo] = {
+            self.__buildings_infos: dict[str, BuildingInfo] = {
                 building["name"]: BuildingInfo(
                     building["name"],
                     os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -126,8 +133,10 @@ class ViewPort:
                 for building in building_infos
             }
 
-        # base image resolution = 64 px / m
-        self.__rendered_images = dict()
+        self.__scaled_building_images = {
+            building.name: building.get_scaled_image(self.__resolution)
+            for building in self.__buildings_infos.values()
+        }
         self.resolution = self.__resolution     # Will render the images with the right scale
 
     @property
@@ -148,18 +157,19 @@ class ViewPort:
 
     @resolution.setter
     def resolution(self, r: int):
-        self.__rendered_images = {
-            building.name: building.get_scaled_image(r)
-            for building in self.__buildings.values()
-        }
         self.__resolution = r
+
+        self.__scaled_building_images = {
+            building.name: building.get_scaled_image(self.__resolution)
+            for building in self.__buildings_infos.values()
+        }
 
     def process_events(self, events: list[pygame.event.Event]):
         keys_pressed = pygame.key.get_pressed()
 
         for event in events:
             if event.type == pygame.MOUSEMOTION:
-                if event.buttons[1] or (event.buttons[0] and keys_pressed[pygame.K_LSHIFT]):
+                if event.buttons[1] or (event.buttons[0] and keys_pressed[pygame.K_LCTRL]):
                     self.__pan(event.rel)
 
             elif event.type == pygame.MOUSEWHEEL:
@@ -171,6 +181,13 @@ class ViewPort:
 
                 elif event.key == pygame.K_f:  # show/hide floor
                     self.__show_floor = not self.__show_floor
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1\
+                        and self.__application.mode == Mode.BUILD\
+                        and not keys_pressed[pygame.K_LCTRL]\
+                        and self.__contains_coord(event.pos):
+                    self.__place_building()
 
     def resize(self, size: tuple[int, int]):
         self.__size = size
@@ -196,11 +213,18 @@ class ViewPort:
         self.__x_offset = int(xoff) + pos[0]
         self.__y_offset = int(yoff) + pos[1]
 
+    def __place_building(self):
+        aligned_pos = self.px_to_meter(*self.__get_mouse_coord())[:2]
+        self.__buildings.append(Building(self.__buildings_infos[self.__application.building_selected], aligned_pos))
+        print(self.__buildings)
+
     def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
 
         if self.__show_floor:
             self.__draw_floor()
+
+        self.__draw_buildings()
 
         if self.__show_grid:
             self.__draw_grid()
@@ -210,12 +234,8 @@ class ViewPort:
 
         surface.blit(self.__surface, self.__pos)
 
-    def __draw_selected_building(self):
-        aligned_pos = self.meter_to_px(*self.px_to_meter(*self.__get_mouse_coord()))[:2]
-        self.__surface.blit(self.__rendered_images[self.__application.building_selected], aligned_pos)
-
     def __draw_floor(self):
-        floor: pygame.Surface = self.__rendered_images["floor"]
+        floor: pygame.Surface = self.__scaled_building_images["floor"]
         w, h = floor.get_width(), floor.get_height()  # image
         width, height = self.__size[0], self.__size[1]  # viewport
         mod_xoffset, mod_yoffset = self.__x_offset % w - w, self.__y_offset % h - h
@@ -223,6 +243,11 @@ class ViewPort:
         for x in range(mod_xoffset, width + 1, w):
             for y in range(mod_yoffset, height + 1, h):
                 self.__surface.blit(floor, (x, y))
+
+    def __draw_buildings(self):
+        for building in self.__buildings:
+            pos = self.meter_to_px(*building.pos)[:2]
+            self.__surface.blit(self.__scaled_building_images[building.name], pos)
 
     def __draw_grid(self):
         mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
@@ -236,6 +261,10 @@ class ViewPort:
             pygame.draw.line(self.__surface, settings.grid_color, (mod_xoffset - self.__resolution, y),
                              (mod_xoffset + width, y))
 
+    def __draw_selected_building(self):
+        aligned_pos = self.meter_to_px(*self.px_to_meter(*self.__get_mouse_coord()))[:2]
+        self.__surface.blit(self.__scaled_building_images[self.__application.building_selected], aligned_pos)
+
     @staticmethod
     def __get_mouse_coord() -> tuple[int, int]:
         """
@@ -243,6 +272,10 @@ class ViewPort:
         """
         x, y = pygame.mouse.get_pos()
         return x, y - settings.control_bar_size
+
+    def __contains_coord(self, pos: list[int, int]):
+        x, y = pos
+        return 0 < x < self.__size[0] and 0 < y - settings.control_bar_size < self.__size[1]
 
     def meter_to_px(self, x: int, y: int, w: int = 0, h: int = 0) -> tuple[int, int, int, int]:
         """
