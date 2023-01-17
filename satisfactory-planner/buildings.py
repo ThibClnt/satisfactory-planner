@@ -43,3 +43,45 @@ class BuildingInfo:
     @property
     def image(self) -> pygame.Surface:
         return self.__image
+
+
+class Building:
+
+    def __init__(self, info: BuildingInfo, pos: tuple[int, int]):
+        self.__info = info
+        self.__x, self.__y = pos
+
+    def get_scaled_image(self, resolution: int) -> pygame.Surface:
+        return self.__info.get_scaled_image(resolution)
+
+    @property
+    def name(self):
+        return self.__info.name
+
+    @property
+    def pos(self) -> tuple[int, int]:
+        return self.__x, self.__y
+
+    @property
+    def x(self) -> int:
+        return self.__x
+
+    @property
+    def y(self) -> int:
+        return self.__y
+
+    @property
+    def w(self) -> int:
+        return self.__info.w
+
+    @property
+    def h(self) -> int:
+        return self.__info.h
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return self.__info.w, self.__info.h
+
+    @property
+    def image(self) -> pygame.Surface:
+        return self.__info.image
