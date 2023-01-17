@@ -31,8 +31,6 @@ class Application:
         self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), settings.control_bar_color)
         self.__viewport = ViewPort(self, (0, settings.control_bar_size), size)
 
-        self.__building_name: str = "conveyor"
-
     def loop(self):
         while self.__running:
             self.process_events()
@@ -88,13 +86,8 @@ class Application:
         self.__mode = value
 
     @property
-    def building_selected(self) -> str:
-        return self.__building_name
-
-    @building_selected.setter
-    def building_selected(self, building_name: str):
-        self.__building_name = building_name
-        self.mode = Mode.BUILD
+    def viewport(self):
+        return self.__viewport
 
 
 class ViewPort:
@@ -117,8 +110,13 @@ class ViewPort:
         self.__buildings: list[Building] = []
         self.__buildings_infos: dict[str, BuildingInfo] = dict()
         self.__scaled_building_images: dict[str, pygame.Surface] = dict()
-
         self.__load_buildings()
+
+        # name, scaled and rotated image
+        self.__building_selected: dict[str, str | pygame.Surface] = {
+            "name": "conveyor",
+            "image": self.__buildings_infos["conveyor"].get_scaled_image(self.__resolution)
+        }
 
     def __load_buildings(self):
         with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/buildings.json"), 'r') as file:
@@ -137,7 +135,6 @@ class ViewPort:
             building.name: building.get_scaled_image(self.__resolution)
             for building in self.__buildings_infos.values()
         }
-        self.resolution = self.__resolution  # Will render the images with the right scale
 
     @property
     def application(self):
@@ -162,6 +159,18 @@ class ViewPort:
         self.__scaled_building_images = {
             building.name: building.get_scaled_image(self.__resolution)
             for building in self.__buildings_infos.values()
+        }
+        self.__building_selected["image"] = self.__buildings_infos[self.__building_selected["name"]].get_scaled_image(self.__resolution)
+
+    @property
+    def building_selected(self) -> str:
+        return self.__building_selected["name"]
+
+    @building_selected.setter
+    def building_selected(self, building_name: str):
+        self.__building_selected = {
+            "name": building_name,
+            "image": self.__buildings_infos[building_name].get_scaled_image(self.__resolution)
         }
 
     def process_events(self, events: list[pygame.event.Event]):
@@ -215,8 +224,7 @@ class ViewPort:
 
     def __place_building(self):
         aligned_pos = self.px_to_meter(*self.__get_mouse_coord())[:2]
-        self.__buildings.append(Building(self.__buildings_infos[self.__application.building_selected], aligned_pos))
-        print(self.__buildings)
+        self.__buildings.append(Building(self.__buildings_infos[self.__building_selected["name"]], aligned_pos))
 
     def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
@@ -263,7 +271,7 @@ class ViewPort:
 
     def __draw_selected_building(self):
         aligned_pos = self.meter_to_px(*self.px_to_meter(*self.__get_mouse_coord()))[:2]
-        self.__surface.blit(self.__scaled_building_images[self.__application.building_selected], aligned_pos)
+        self.__surface.blit(self.__building_selected["image"], aligned_pos)
 
     @staticmethod
     def __get_mouse_coord() -> tuple[int, int]:
@@ -378,7 +386,8 @@ class ControlBar:
         button.set_focus()
 
         # Change mode and current building
-        self.__application.building_selected = \
+        self.__application.mode = Mode.BUILD
+        self.__application.viewport.building_selected = \
             self.__shortcuts_properties[(building_index + 1) % len(self.__shortcuts_properties.keys())][2]
 
     def loose_shortcuts_focus(self):
