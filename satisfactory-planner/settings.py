@@ -1,10 +1,10 @@
 fullscreen = True
 
 # Recommanded to stay between 4 and 64 px/m
-default_resolution = 16
+default_resolution = 4
 
 background_color = "#283a5c"
-grid_color = "#507090"
+grid_color = "#384050"
 
 control_bar_size = 56
 control_bar_color = "#404040"
