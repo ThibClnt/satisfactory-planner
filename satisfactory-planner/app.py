@@ -1,22 +1,17 @@
-import os.path
-from typing import Any
 import json
+from typing import Any
 
 import pygame
 
 import settings
-from ui import ImageButton, ShortcutButton
 from buildings import BuildingInfo, Building
+from common import get_path
+from ui import ImageButton, ShortcutButton
 
 
 class Mode:
     IDLE = 0
     BUILD = 1
-
-    names = {
-        IDLE: "IDLE",
-        BUILD: "BUILD"
-    }
 
 
 class Application:
@@ -60,7 +55,6 @@ class Application:
 
         self.__controlbar.resize((w, settings.control_bar_size))
         self.__viewport.resize((w, h))
-        print(f"Resized to {size[0]} x {size[1]}")
 
     def render(self):
         self.__screen.fill((0, 0, 0))
@@ -77,9 +71,6 @@ class Application:
 
     @mode.setter
     def mode(self, value: int):
-        if self.__mode != value:
-            print(f"Mode set to {Mode.names[value]}")
-
         if value != Mode.BUILD:
             self.__controlbar.loose_shortcuts_focus()
 
@@ -107,12 +98,14 @@ class ViewPort:
         self.__show_floor = True
         self.__show_grid = False
 
+        # Load buildings data
         self.__buildings: list[Building] = []
         self.__buildings_infos: dict[str, BuildingInfo] = dict()
-        self.__scaled_building_images: dict[str, list[pygame.Surface]] = dict()
+        self.__building_images: dict[str, list[pygame.Surface]] = dict()
         self.__load_buildings()
 
-        self.__selected_building_overlay: Building = Building(self.__buildings_infos["conveyor"], (0, 0))
+        # Building selected in build mode
+        self.__current_building: Building = Building(self.__buildings_infos["conveyor"], (0, 0))
 
         self.__conveyor_types = (
             "conveyor", "conveyor-reduced", "conveyor-l-shaped", "conveyor-wave-left", "conveyor-wave-right"
@@ -120,68 +113,38 @@ class ViewPort:
         self.__conveyor_index = 0
 
     def __load_buildings(self):
-        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../data/buildings.json"), 'r') as file:
+        with open(get_path("data/buildings.json"), 'r') as file:
             building_infos = json.load(file)["buildings"]
-            self.__buildings_infos: dict[str, BuildingInfo] = {
-                building["name"]: BuildingInfo(
+            for building in building_infos:
+                self.__buildings_infos[building["name"]] = BuildingInfo(
                     building["name"],
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                 "../ressources/top/" + building["name"] + ".png"),
+                    get_path("ressources/top/" + building["name"] + ".png"),
                     building["size"]
                 )
-                for building in building_infos
-            }
+
         self.__rescale_building_images()
 
     def __rescale_building_images(self):
-        self.__scaled_building_images = {
-            building.name: [
-                pygame.transform.rotate(building.get_scaled_image(self.__resolution), angle)
-                for angle in range(0, 360, 90)
-            ]
-            for building in self.__buildings_infos.values()
-        }
-
-    @property
-    def application(self):
-        return self.__application
-
-    @property
-    def x_offset(self) -> int:
-        return self.__x_offset
-
-    @property
-    def y_offset(self) -> int:
-        return self.__y_offset
-
-    @property
-    def resolution(self) -> int:
-        return self.__resolution
-
-    @resolution.setter
-    def resolution(self, r: int):
-        self.__resolution = r
-        self.__rescale_building_images()
-
-    @property
-    def selected_building_name(self) -> str:
-        return self.__selected_building_overlay.name
-
-    @selected_building_name.setter
-    def selected_building_name(self, building_name: str):
-        angle = self.__selected_building_overlay.angle
-        self.__selected_building_overlay = Building(self.__buildings_infos[building_name], (0, 0), angle)
-        print(f"Selected building set to {self.__selected_building_overlay}")
+        for building in self.__buildings_infos.values():
+            scaled_image = building.get_scaled_image(self.__resolution)
+            self.__building_images[building.name] = \
+                [
+                    pygame.transform.rotate(scaled_image, angle)
+                    for angle in (0, 90, 180, 270)
+                ]
 
     def process_events(self, events: list[pygame.event.Event]):
+        def is_building_conveyor():
+            return "conveyor" in self.__current_building.name and self.__application.mode == Mode.BUILD
+
         keys_pressed = pygame.key.get_pressed()
 
         for event in events:
             if event.type == pygame.MOUSEMOTION:
-                if event.buttons[0] and keys_pressed[pygame.K_LCTRL]:
+                if event.buttons[1] or (event.buttons[0] and keys_pressed[pygame.K_LCTRL]):
                     self.__pan(event.rel)
 
-            elif event.type == pygame.MOUSEWHEEL and keys_pressed[pygame.K_LCTRL]:
+            elif event.type == pygame.MOUSEWHEEL:
                 self.__zoom(event.y, pygame.mouse.get_pos())
 
             elif event.type == pygame.MOUSEWHEEL and self.__application.mode == Mode.BUILD:
@@ -194,14 +157,22 @@ class ViewPort:
                 elif event.key == pygame.K_f:  # show/hide floor
                     self.__show_floor = not self.__show_floor
 
-                elif event.key == pygame.K_r and "conveyor" in self.__selected_building_overlay.name and self.__application.mode == Mode.BUILD:  # Next conveyor type
-                    self.__next_conveyor_type()
+                elif (event.key == pygame.K_q or event.key == pygame.K_LEFT) and is_building_conveyor():
+                    self.__next_conveyor_type(-1)
+
+                elif (event.key == pygame.K_d or event.key == pygame.K_RIGHT) and is_building_conveyor():
+                    self.__next_conveyor_type(1)
+
+                elif event.key == pygame.K_r and self.__application.mode == Mode.BUILD:
+                    self.__rotate_selected(-1 if keys_pressed[pygame.K_LSHIFT] else 1)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1 \
-                        and self.__application.mode == Mode.BUILD \
-                        and not keys_pressed[pygame.K_LCTRL] \
-                        and self.__contains_coord(event.pos):
+                if (
+                        event.button == 1
+                        and self.__application.mode == Mode.BUILD
+                        and not keys_pressed[pygame.K_LCTRL]
+                        and self.__contains_coord(event.pos)
+                ):
                     self.__place_building()
 
     def resize(self, size: tuple[int, int]):
@@ -229,16 +200,22 @@ class ViewPort:
         self.__y_offset = int(yoff) + pos[1]
 
     def __rotate_selected(self, direction: int):
-        self.__selected_building_overlay.rotate(-90 * direction)
+        self.__current_building.rotate(-90 * direction)
 
     def __place_building(self):
-        aligned_pos = self.px_to_meter(*self.__get_mouse_coord())[:2]
-        building = Building(self.__buildings_infos[self.selected_building_name], aligned_pos,
-                            self.__selected_building_overlay.angle)
+        mouse_pos = self.__get_mouse_coord()
+        grid_pos = self.px_to_meter(*mouse_pos)[:2]
+
+        building = Building(
+            self.__buildings_infos[self.selected_building_name],
+            grid_pos,
+            self.__current_building.angle
+        )
+
         self.__buildings.append(building)
 
-    def __next_conveyor_type(self):
-        self.__conveyor_index = (self.__conveyor_index + 1) % len(self.__conveyor_types)
+    def __next_conveyor_type(self, direction: int):
+        self.__conveyor_index = (self.__conveyor_index + direction) % len(self.__conveyor_types)
         self.selected_building_name = self.__conveyor_types[self.__conveyor_index]
 
     def render(self, surface: pygame.Surface):
@@ -258,42 +235,58 @@ class ViewPort:
         surface.blit(self.__surface, self.__pos)
 
     def __draw_floor(self):
-        floor: pygame.Surface = self.__scaled_building_images["floor"][0]
-        w, h = floor.get_width(), floor.get_height()  # image
-        width, height = self.__size[0], self.__size[1]  # viewport
-        mod_xoffset, mod_yoffset = self.__x_offset % w - w, self.__y_offset % h - h
+        floor: pygame.Surface = self.__building_images["floor"][0]
 
-        for x in range(mod_xoffset, width + 1, w):
-            for y in range(mod_yoffset, height + 1, h):
+        floor_width, floor_height = floor.get_width(), floor.get_height()  # floor image
+        view_width, view_height = self.__size[0], self.__size[1]  # viewport
+
+        offset_x = self.__x_offset % floor_width - floor_width
+        offset_y = self.__y_offset % floor_height - floor_height
+
+        for x in range(offset_x, view_width + 1, floor_width):
+            for y in range(offset_y, view_height + 1, floor_height):
                 self.__surface.blit(floor, (x, y))
 
     def __draw_buildings(self):
         for building in self.__buildings:
-            pos = self.meter_to_px(*building.pos)[:2]
-            self.__surface.blit(
-                self.__scaled_building_images[building.name][(building.angle % 360) // 90].convert_alpha(), pos)
+            building_image = self.__building_images[building.name][(building.angle % 360) // 90]
+
+            x_px, y_px = self.meter_to_px(*building.pos)[:2]
+            x_px -= building_image.get_width() / 2
+            y_px -= building_image.get_height() / 2
+
+            self.__surface.blit(building_image, (x_px, y_px))
 
     def __draw_grid(self):
-        mod_xoffset, mod_yoffset = self.__x_offset % self.__resolution, self.__y_offset % self.__resolution
-        width, height = self.__size[0], self.__size[1]
+        offset_x = self.__x_offset % self.__resolution
+        offset_y = self.__y_offset % self.__resolution
+        view_width, view_height = self.__size[0], self.__size[1]
 
-        for x in range(mod_xoffset, width + 1, self.__resolution):
-            pygame.draw.line(self.__surface, settings.grid_color, (x, mod_yoffset - self.__resolution),
-                             (x, mod_yoffset + height))
+        for x in range(offset_x, view_width + 1, self.__resolution):
+            from_pos = (x, offset_y - self.__resolution)
+            to_pos = (x, offset_y + view_height)
+            pygame.draw.line(self.__surface, settings.grid_color, from_pos, to_pos)
 
-        for y in range(mod_yoffset, height + 1, self.__resolution):
-            pygame.draw.line(self.__surface, settings.grid_color, (mod_xoffset - self.__resolution, y),
-                             (mod_xoffset + width, y))
+        for y in range(offset_y, view_height + 1, self.__resolution):
+            from_pos = (offset_x - self.__resolution, y)
+            to_pos = (offset_x + view_width, y)
+            pygame.draw.line(self.__surface, settings.grid_color, from_pos, to_pos)
 
     def __draw_selected_building(self):
-        aligned_pos = self.meter_to_px(*self.px_to_meter(*self.__get_mouse_coord()))[:2]
-        self.__surface.blit(self.__scaled_building_images[self.__selected_building_overlay.name][
-                                (self.__selected_building_overlay.angle % 360) // 90], aligned_pos)
+        building_image = self.__building_images[self.__current_building.name][
+            (self.__current_building.angle % 360) // 90]
+        grid_pos = self.px_to_meter(*self.__get_mouse_coord())
+
+        x_px, y_px = self.meter_to_px(*grid_pos)[:2]
+        x_px -= building_image.get_width() / 2
+        y_px -= building_image.get_height() / 2
+
+        self.__surface.blit(building_image, (x_px, y_px))
 
     @staticmethod
     def __get_mouse_coord() -> tuple[int, int]:
         """
-        :return: Mouse coordinate on the viewport's surface
+        :return: Mouse position in the viewport, in px
         """
         x, y = pygame.mouse.get_pos()
         return x, y - settings.control_bar_size
@@ -334,6 +327,36 @@ class ViewPort:
                 int((w + 1) / self.__resolution),
                 int((h + 1) / self.__resolution))
 
+    @property
+    def application(self):
+        return self.__application
+
+    @property
+    def x_offset(self) -> int:
+        return self.__x_offset
+
+    @property
+    def y_offset(self) -> int:
+        return self.__y_offset
+
+    @property
+    def resolution(self) -> int:
+        return self.__resolution
+
+    @resolution.setter
+    def resolution(self, r: int):
+        self.__resolution = r
+        self.__rescale_building_images()
+
+    @property
+    def selected_building_name(self) -> str:
+        return self.__current_building.name
+
+    @selected_building_name.setter
+    def selected_building_name(self, building_name: str):
+        angle = self.__current_building.angle
+        self.__current_building = Building(self.__buildings_infos[building_name], (0, 0), angle)
+
 
 class ControlBar:
 
@@ -341,47 +364,52 @@ class ControlBar:
         self.__application = application
         self.__color = color
         self.__w, self.__h = size
-        self.__close_button = ImageButton(
-            (self.__w - 40, (settings.control_bar_size - settings.close_button_size) / 2),
-            (settings.close_button_size, settings.close_button_size),
-            os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         "../ressources/close.png"), self.__application.quit)
 
-        # int(text): (index, text, name)
-        self.__shortcuts_properties = {
-            1: (0, "1", "conveyor"),
-            2: (1, "2", "splitter"),
-            3: (2, "3", "merger"),
-            4: (3, "4", "smelter"),
-            5: (4, "5", "foundry"),
-            6: (5, "6", "refinery"),
-            7: (6, "7", "constructor"),
-            8: (7, "8", "assembler"),
-            9: (8, "9", "manufacturer"),
-            0: (9, "0", "container"),
-        }
+        close_button_pos = (self.__w - 40, (settings.control_bar_size - settings.close_button_size) / 2)
+        close_button_size = (settings.close_button_size, settings.close_button_size)
+        self.__close_button = ImageButton(close_button_pos, close_button_size, get_path("ressources/close.png"),
+                                          self.__application.quit)
 
-        shortcut_button_padding = 4
-        shortcut_buttons_count = 10
-        first_shortcut_x = (self.__w - shortcut_buttons_count * (
-                settings.shortcut_button__size + shortcut_button_padding) + shortcut_button_padding) / 2
+        self.__shortcuts_properties: dict[int, tuple[int, str, str]] = dict()
+        self.__buttons: list[ShortcutButton] = []
+        self.__create_shortcuts_buttons()
 
-        self.__buttons = [
-            ShortcutButton((first_shortcut_x + i * (settings.shortcut_button__size + shortcut_button_padding),
-                            shortcut_button_padding),
-                           (settings.shortcut_button__size, settings.shortcut_button__size),
-                           os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                        "../ressources/shortcuts/" + n + ".png"),
-                           t, lambda _: 0, settings.shortcut_button_background_color,
-                           settings.shortcut_button_focus_color
-                           )
-            for i, t, n in self.__shortcuts_properties.values()
-        ]
+    def __create_shortcuts_buttons(self):
+        self.__shortcuts_properties = {1: (0, "1", "conveyor"),
+                                       2: (1, "2", "splitter"),
+                                       3: (2, "3", "merger"),
+                                       4: (3, "4", "smelter"),
+                                       5: (4, "5", "foundry"),
+                                       6: (5, "6", "refinery"),
+                                       7: (6, "7", "constructor"),
+                                       8: (7, "8", "assembler"),
+                                       9: (8, "9", "manufacturer"),
+                                       0: (9, "0", "container")}
+
+        offset_x = (
+                    self.__w + settings.shortcut_button_padding
+                    - (settings.shortcut_button_size + settings.shortcut_button_padding) * len(self.__shortcuts_properties)
+                   ) / 2
+
+        for i, text, name in self.__shortcuts_properties.values():
+            pos = (offset_x + i * (settings.shortcut_button_size + settings.shortcut_button_padding),
+                   settings.shortcut_button_padding)
+            size = (settings.shortcut_button_size, settings.shortcut_button_size)
+
+            self.__buttons.append(
+                ShortcutButton(
+                    pos, size, get_path("ressources/shortcuts/" + name + ".png"), text,
+                    color=settings.shortcut_button_background_color,
+                    border_color=settings.shortcut_button_focus_color
+                )
+            )
 
     def render(self, surface: pygame.Surface):
         pygame.draw.rect(surface, self.__color, pygame.Rect(0, 0, self.__w, self.__h))
+
         for button in self.__buttons:
             button.render(surface)
+
         self.__close_button.render(surface)
 
     def process_event(self, events):
@@ -406,27 +434,25 @@ class ControlBar:
         button.set_focus()
 
         # Change mode and current building
+        shortcut_index = (building_index + 1) % len(self.__shortcuts_properties.keys())
+        self.__application.viewport.selected_building_name = self.__shortcuts_properties[shortcut_index][2]
         self.__application.mode = Mode.BUILD
-        self.__application.viewport.selected_building_name = \
-            self.__shortcuts_properties[(building_index + 1) % len(self.__shortcuts_properties.keys())][2]
 
     def loose_shortcuts_focus(self):
         for b in self.__buttons:
             b.loose_focus()
 
     def resize(self, size: tuple[int, int]):
-        print(f"Control bar resized to {size[0]} x {size[1]}")
         self.__w, self.__h = size
         self.__close_button.pos = (self.__w - 40, (settings.control_bar_size - 32) / 2)
         self.__update_shortcuts_pos()
 
     def __update_shortcuts_pos(self):
-        shortcut_button_padding = 4
-        shortcut_buttons_count = 10
-        first_shortcut_x = (self.__w - shortcut_buttons_count * (
-                settings.shortcut_button__size + shortcut_button_padding) + shortcut_button_padding) / 2
+        offset_x = (
+                    self.__w + settings.shortcut_button_padding
+                    - (settings.shortcut_button_size + settings.shortcut_button_padding) * len(self.__shortcuts_properties)
+                   ) / 2
 
         for i, button in enumerate(self.__buttons):
-            button.pos = (
-                first_shortcut_x + i * (settings.shortcut_button__size + shortcut_button_padding),
-                shortcut_button_padding)
+            button.pos = (offset_x + i * (settings.shortcut_button_size + settings.shortcut_button_padding),
+                          settings.shortcut_button_padding)

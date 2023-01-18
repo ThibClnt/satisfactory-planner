@@ -113,7 +113,7 @@ class ShortcutButton(Button):
     margin = 4
     font = pygame.font.Font(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../ressources/fonts/Satisfontory_v1.5.ttf"), font_size)
 
-    def __init__(self, pos: tuple[int, int], size: tuple[int, int], image_path: Any, text: str, action: Callable,
+    def __init__(self, pos: tuple[int, int], size: tuple[int, int], image_path: Any, text: str, action: Callable = lambda _: 0,
                  color: Any = None, border_color: Any = None, border_width: int = 0, border_radius: int = -1, *args):
 
         super().__init__(pos, size, action, color, border_color, border_width, border_radius, *args)

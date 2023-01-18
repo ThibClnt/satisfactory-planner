@@ -13,6 +13,7 @@ shortcut_button_background_color = "#202020"
 shortcut_button_focus_color = "#a0a0a0"
 shortcut_button_font_color = "#ffffff"
 shortcut_button_font_size = 12
-shortcut_button__size = 48
+shortcut_button_size = 48
+shortcut_button_padding = 4
 
 close_button_size = 32
