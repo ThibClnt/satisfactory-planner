@@ -5,13 +5,8 @@ import pygame
 
 import settings
 from buildings import BuildingInfo, Building
-from common import get_path
+from common import Mode, get_path
 from ui import ImageButton, ShortcutButton
-
-
-class Mode:
-    IDLE = 0
-    BUILD = 1
 
 
 class Application:

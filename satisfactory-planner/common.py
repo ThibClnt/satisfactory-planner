@@ -2,6 +2,11 @@ import os.path
 from os import PathLike
 
 
+class Mode:
+    IDLE = 0
+    BUILD = 1
+
+
 def get_path(relative_path: str | PathLike[bytes]) -> str:
     """
     :param relative_path: Relative path from root directory to a file
