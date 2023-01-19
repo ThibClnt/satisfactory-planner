@@ -15,8 +15,8 @@ class ViewPort:
     At start, the rendering is set to 16px/m.
     """
 
-    def __init__(self, application: Application, pos: tuple[int, int], size: tuple[int, int]):
-        self.__application = application
+    def __init__(self, app_state: AppState, pos: tuple[int, int], size: tuple[int, int]):
+        self.__app_state = app_state
         self.__pos = pos
         self.__size = size
         self.__surface = pygame.Surface(size)
@@ -27,7 +27,7 @@ class ViewPort:
 
         # Load buildings data
         self.__buildings: list[Building] = []
-        self.__buildings_infos: dict[str, BuildingInfo] = dict()
+        self.__buildings_infos: dict[str, BuildingType] = dict()
         self.__building_images: dict[str, list[pygame.Surface]] = dict()
         self.__load_buildings()
 
@@ -43,7 +43,7 @@ class ViewPort:
         with open(get_path("data/buildings.json"), 'r') as file:
             building_infos = json.load(file)["buildings"]
             for building in building_infos:
-                self.__buildings_infos[building["name"]] = BuildingInfo(
+                self.__buildings_infos[building["name"]] = BuildingType(
                     building["name"],
                     get_path("ressources/top/" + building["name"] + ".png"),
                     building["size"]
@@ -62,7 +62,7 @@ class ViewPort:
 
     def process_events(self, events: list[pygame.event.Event]):
         def is_building_conveyor():
-            return "conveyor" in self.__current_building.name and self.__application.mode == Mode.BUILD
+            return "conveyor" in self.__current_building.name and self.__app_state.get() == AppState.BUILD
 
         keys_pressed = pygame.key.get_pressed()
 
@@ -74,7 +74,7 @@ class ViewPort:
             elif event.type == pygame.MOUSEWHEEL:
                 self.__zoom(event.y, pygame.mouse.get_pos())
 
-            elif event.type == pygame.MOUSEWHEEL and self.__application.mode == Mode.BUILD:
+            elif event.type == pygame.MOUSEWHEEL and self.__app_state.get() == AppState.BUILD:
                 self.__rotate_selected(event.y)
 
             elif event.type == pygame.KEYDOWN:
@@ -90,15 +90,15 @@ class ViewPort:
                 elif (event.key == pygame.K_d or event.key == pygame.K_RIGHT) and is_building_conveyor():
                     self.__next_conveyor_type(1)
 
-                elif event.key == pygame.K_r and self.__application.mode == Mode.BUILD:
+                elif event.key == pygame.K_r and self.__app_state.get() == AppState.BUILD:
                     self.__rotate_selected(-1 if keys_pressed[pygame.K_LSHIFT] else 1)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if (
                         event.button == 1
-                        and self.__application.mode == Mode.BUILD
+                        and self.__app_state.get() == AppState.BUILD
                         and not keys_pressed[pygame.K_LCTRL]
-                        and self.__contains_coord(event.pos)
+                        and self.contains_coord(event.pos)
                 ):
                     self.__place_building()
 
@@ -130,7 +130,7 @@ class ViewPort:
         self.__current_building.rotate(-90 * direction)
 
     def __place_building(self):
-        mouse_pos = self.__get_mouse_coord()
+        mouse_pos = self.get_view_coord(pygame.mouse.get_pos())
         grid_pos = self.px_to_meter(*mouse_pos)[:2]
 
         building = Building(
@@ -156,7 +156,7 @@ class ViewPort:
         if self.__show_grid:
             self.__draw_grid()
 
-        if self.__application.mode == Mode.BUILD:
+        if self.__app_state.get() == AppState.BUILD:
             self.__draw_selected_building()
 
         surface.blit(self.__surface, self.__pos)
@@ -202,7 +202,7 @@ class ViewPort:
     def __draw_selected_building(self):
         building_image = self.__building_images[self.__current_building.name][
             (self.__current_building.angle % 360) // 90]
-        grid_pos = self.px_to_meter(*self.__get_mouse_coord())
+        grid_pos = self.px_to_meter(*self.get_view_coord(pygame.mouse.get_pos()))
 
         x_px, y_px = self.meter_to_px(*grid_pos)[:2]
         x_px -= building_image.get_width() / 2
@@ -210,15 +210,16 @@ class ViewPort:
 
         self.__surface.blit(building_image, (x_px, y_px))
 
-    @staticmethod
-    def __get_mouse_coord() -> tuple[int, int]:
+    def get_view_coord(self, pos: tuple[int, int]) -> tuple[int, int]:
         """
         :return: Mouse position in the viewport, in px
         """
-        x, y = pygame.mouse.get_pos()
-        return x, y - settings.control_bar_size
+        x = trim(pos[0] - self.__pos[0], 0, self.__size[0])
+        y = trim(pos[1] - self.__pos[1], 0, self.__size[1])
 
-    def __contains_coord(self, pos: list[int, int]):
+        return x, y
+
+    def contains_coord(self, pos: tuple[int, int]):
         x, y = pos
         return 0 < x < self.__size[0] and 0 < y - settings.control_bar_size < self.__size[1]
 
@@ -253,18 +254,6 @@ class ViewPort:
                 ny,
                 int((w + 1) / self.__resolution),
                 int((h + 1) / self.__resolution))
-
-    @property
-    def application(self):
-        return self.__application
-
-    @property
-    def x_offset(self) -> int:
-        return self.__x_offset
-
-    @property
-    def y_offset(self) -> int:
-        return self.__y_offset
 
     @property
     def resolution(self) -> int:

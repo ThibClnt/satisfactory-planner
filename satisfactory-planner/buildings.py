@@ -30,11 +30,11 @@ class BuildingType:
         return self.__name
 
     @property
-    def w(self) -> int:
+    def width(self) -> int:
         return self.__w
 
     @property
-    def h(self) -> int:
+    def height(self) -> int:
         return self.__h
 
     @property

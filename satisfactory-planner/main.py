@@ -1,5 +1,5 @@
 import pygame
-from app import Application
+from application import Application
 from settings import fullscreen
 
 pygame.init()

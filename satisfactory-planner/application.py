@@ -1,9 +1,9 @@
+from __future__ import annotations
 from typing import Any
-
 import pygame
 
 import settings
-from common import Mode, get_path
+from common import get_path, AppState
 from ui import ImageButton, ShortcutButton
 from view import ViewPort
 
@@ -15,11 +15,11 @@ class Application:
         self.__running = True
         self.__screen = pygame.display.set_mode(size, flags)
 
-        self.__mode = Mode.IDLE
+        self.__state = AppState()
 
         self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), settings.control_bar_color)
-        self.__hotbar = HotBar(self, HotBar.calculate_center_pos(size[0], settings.control_bar_size))
-        self.__viewport = ViewPort(self, (0, settings.control_bar_size), size)
+        self.__hotbar = HotBar(self, self.__state, HotBar.calculate_center_pos(size[0], settings.control_bar_size))
+        self.__viewport = ViewPort(self.__state, (0, settings.control_bar_size), size)
 
     def loop(self):
         while self.__running:
@@ -37,8 +37,8 @@ class Application:
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    if self.__mode == Mode.BUILD:
-                        self.mode = Mode.IDLE
+                    if self.__state.get() == AppState.BUILD:
+                        self.__set_idle()
 
         self.__controlbar.process_events(events)
         self.__hotbar.process_events(events)
@@ -53,6 +53,10 @@ class Application:
         self.__hotbar.resize((w, settings.control_bar_size))
         self.__viewport.resize((w, h))
 
+    def __set_idle(self):
+        self.__state.set(AppState.IDLE)
+        self.__hotbar.loose_focus()
+
     def render(self):
         self.__screen.fill((0, 0, 0))
         self.__controlbar.render(self.__screen)
@@ -64,17 +68,6 @@ class Application:
         self.__running = False
 
     @property
-    def mode(self) -> int:
-        return self.__mode
-
-    @mode.setter
-    def mode(self, value: int):
-        if value != Mode.BUILD:
-            self.__hotbar.loose_focus()
-
-        self.__mode = value
-
-    @property
     def viewport(self):
         return self.__viewport
 
@@ -82,14 +75,12 @@ class Application:
 class ControlBar:
 
     def __init__(self, application: Application, size: tuple[int, int], color: Any):
-        self.__application = application
         self.__color = color
         self.__w, self.__h = size
 
         close_button_pos = (self.__w - 40, (settings.control_bar_size - settings.close_button_size) / 2)
         close_button_size = (settings.close_button_size, settings.close_button_size)
-        self.__close_button = ImageButton(close_button_pos, close_button_size, get_path("ressources/close.png"),
-                                          self.__application.quit)
+        self.__close_button = ImageButton(close_button_pos, close_button_size, get_path("ressources/close.png"), application.quit)
 
     def render(self, surface: pygame.Surface):
         pygame.draw.rect(surface, self.__color, pygame.Rect(0, 0, self.__w, self.__h))
@@ -128,8 +119,9 @@ class HotBar:
 
         return x, y
 
-    def __init__(self, application: Application, pos: tuple[int, int]):
-        self.__application = application
+    def __init__(self, application: Application, app_state: AppState, pos: tuple[int, int]):
+        self.__application = application    # TODO Shift link to overlay
+        self.__app_state = app_state
         self.__x, self.__y = pos
 
         self.__buttons: list[ShortcutButton] = []
@@ -176,7 +168,7 @@ class HotBar:
         # Change mode and current building
         button_index = (button_index + 1) % len(self.shortcuts_properties.keys())
         self.__application.viewport.selected_building_name = self.shortcuts_properties[button_index][2]
-        self.__application.mode = Mode.BUILD
+        self.__app_state.set(AppState.BUILD)
 
     def loose_focus(self):
         for b in self.__buttons:
