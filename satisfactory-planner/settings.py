@@ -1,7 +1,7 @@
 fullscreen = True
 
 # Recommanded to stay between 4 and 64 px/m
-default_resolution = 4
+default_resolution = 16
 
 background_color = "#283a5c"
 grid_color = "#384050"

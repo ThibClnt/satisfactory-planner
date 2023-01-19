@@ -4,13 +4,8 @@ import json
 import pygame
 
 import settings
-from buildings import BuildingInfo, Building
-from common import Mode, get_path
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app import Application
+from buildings import BuildingType, Building
+from common import get_path, trim, AppState
 
 
 class ViewPort:

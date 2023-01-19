@@ -3,7 +3,7 @@ import pygame
 from typing import Any
 
 
-class BuildingInfo:
+class BuildingType:
 
     def __init__(self, name: str, image_path: Any, size: list[int, int]):
         """
@@ -48,7 +48,7 @@ class BuildingInfo:
 
 class Building:
 
-    def __init__(self, info: BuildingInfo, pos: tuple[int, int], angle: int = 0):
+    def __init__(self, info: BuildingType, pos: tuple[int, int], angle: int = 0):
         self.__info = info
         self.__x, self.__y = pos
         self.__angle = angle
@@ -84,16 +84,16 @@ class Building:
         return self.__y
 
     @property
-    def w(self) -> int:
-        return self.__info.w
+    def width(self) -> int:
+        return self.__info.width
 
     @property
-    def h(self) -> int:
-        return self.__info.h
+    def height(self) -> int:
+        return self.__info.height
 
     @property
     def size(self) -> tuple[int, int]:
-        return self.__info.w, self.__info.h
+        return self.__info.width, self.__info.height
 
     @property
     def angle(self) -> int:
