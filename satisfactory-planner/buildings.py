@@ -144,3 +144,25 @@ class BuildingInformations:
 
     def get_building_type(self, typename: str) -> BuildingType:
         return self.__building_types[typename]
+
+
+class BuildingStorage:
+
+    def __init__(self):
+        self.__buildings: set[Building] = set()
+
+    def add(self, building: Building):
+        if self.get(building.pos) is not None:
+            return
+        self.__buildings.add(building)
+
+    def remove(self, building: Building):
+        self.__buildings.remove(building)
+
+    def get(self, pos: tuple[int, int]) -> Building:
+        for building in self.__buildings:
+            if building.pos == pos:
+                return building
+
+    def __iter__(self):
+        return self.__buildings.__iter__()

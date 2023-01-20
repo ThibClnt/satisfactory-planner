@@ -4,7 +4,7 @@ import math
 import pygame
 
 import settings
-from buildings import Building, BuildingInformations
+from buildings import Building, BuildingInformations, BuildingStorage
 from common import trim, AppState
 
 
@@ -26,7 +26,7 @@ class ViewPort:
         self.__show_grid = False
 
         # Load buildings data
-        self.__buildings: list[Building] = []
+        self.__building_storage: BuildingStorage = BuildingStorage()
         self.__buildings_infos = BuildingInformations("data/buildings.json")
         self.__buildings_infos.scale_building_images(self.__resolution)
 
@@ -117,7 +117,7 @@ class ViewPort:
             self.__current_building.angle
         )
 
-        self.__buildings.append(building)
+        self.__building_storage.add(building)
 
     def __next_conveyor_type(self, direction: int):
         self.__conveyor_index = (self.__conveyor_index + direction) % len(self.__conveyor_types)
@@ -153,7 +153,7 @@ class ViewPort:
                 self.__surface.blit(floor, (x, y))
 
     def __draw_buildings(self):
-        for building in self.__buildings:
+        for building in self.__building_storage:
             building_image = self.__buildings_infos.get_image(building)
 
             x_px, y_px = self.meter_to_px(*building.pos)[:2]
