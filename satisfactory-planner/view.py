@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
+import math
 import pygame
 
 import settings
-from buildings import BuildingType, Building
-from common import get_path, trim, AppState
+from buildings import Building, BuildingInformations
+from common import trim, AppState
 
 
 class ViewPort:
@@ -27,38 +27,16 @@ class ViewPort:
 
         # Load buildings data
         self.__buildings: list[Building] = []
-        self.__buildings_infos: dict[str, BuildingType] = dict()
-        self.__building_images: dict[str, list[pygame.Surface]] = dict()
-        self.__load_buildings()
+        self.__buildings_infos = BuildingInformations("data/buildings.json")
+        self.__buildings_infos.scale_building_images(self.__resolution)
 
         # Building selected in build mode
-        self.__current_building: Building = Building(self.__buildings_infos["conveyor"], (0, 0))
+        self.__current_building: Building = Building(self.__buildings_infos.get_building_type("conveyor"), (0, 0))
 
         self.__conveyor_types = (
             "conveyor", "conveyor-reduced", "conveyor-l-shaped", "conveyor-wave-left", "conveyor-wave-right"
         )
         self.__conveyor_index = 0
-
-    def __load_buildings(self):
-        with open(get_path("data/buildings.json"), 'r') as file:
-            building_infos = json.load(file)["buildings"]
-            for building in building_infos:
-                self.__buildings_infos[building["name"]] = BuildingType(
-                    building["name"],
-                    get_path("ressources/top/" + building["name"] + ".png"),
-                    building["size"]
-                )
-
-        self.__rescale_building_images()
-
-    def __rescale_building_images(self):
-        for building in self.__buildings_infos.values():
-            scaled_image = building.get_scaled_image(self.__resolution)
-            self.__building_images[building.name] = \
-                [
-                    pygame.transform.rotate(scaled_image, angle)
-                    for angle in (0, 90, 180, 270)
-                ]
 
     def process_events(self, events: list[pygame.event.Event]):
         def is_building_conveyor():
@@ -134,7 +112,7 @@ class ViewPort:
         grid_pos = self.px_to_meter(*mouse_pos)[:2]
 
         building = Building(
-            self.__buildings_infos[self.selected_building_name],
+            self.__buildings_infos.get_building_type(self.selected_building_name),
             grid_pos,
             self.__current_building.angle
         )
@@ -162,7 +140,7 @@ class ViewPort:
         surface.blit(self.__surface, self.__pos)
 
     def __draw_floor(self):
-        floor: pygame.Surface = self.__building_images["floor"][0]
+        floor: pygame.Surface = self.__buildings_infos.get_image_from_name("floor", 0)
 
         floor_width, floor_height = floor.get_width(), floor.get_height()  # floor image
         view_width, view_height = self.__size[0], self.__size[1]  # viewport
@@ -176,7 +154,7 @@ class ViewPort:
 
     def __draw_buildings(self):
         for building in self.__buildings:
-            building_image = self.__building_images[building.name][(building.angle % 360) // 90]
+            building_image = self.__buildings_infos.get_image(building)
 
             x_px, y_px = self.meter_to_px(*building.pos)[:2]
             x_px -= building_image.get_width() / 2
@@ -200,8 +178,7 @@ class ViewPort:
             pygame.draw.line(self.__surface, settings.grid_color, from_pos, to_pos)
 
     def __draw_selected_building(self):
-        building_image = self.__building_images[self.__current_building.name][
-            (self.__current_building.angle % 360) // 90]
+        building_image = self.__buildings_infos.get_image(self.__current_building)
         grid_pos = self.px_to_meter(*self.get_view_coord(pygame.mouse.get_pos()))
 
         x_px, y_px = self.meter_to_px(*grid_pos)[:2]
@@ -261,8 +238,11 @@ class ViewPort:
 
     @resolution.setter
     def resolution(self, r: int):
+        # Ensure r is a power of two
+        r = 2 ** (int(math.log2(r)))
+
         self.__resolution = r
-        self.__rescale_building_images()
+        self.__buildings_infos.scale_building_images(r)
 
     @property
     def selected_building_name(self) -> str:
@@ -271,4 +251,4 @@ class ViewPort:
     @selected_building_name.setter
     def selected_building_name(self, building_name: str):
         angle = self.__current_building.angle
-        self.__current_building = Building(self.__buildings_infos[building_name], (0, 0), angle)
+        self.__current_building = Building(self.__buildings_infos.get_building_type(building_name), (0, 0), angle)

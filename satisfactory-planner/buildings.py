@@ -1,6 +1,11 @@
 from __future__ import annotations
+
+import json
+from os import PathLike
 import pygame
 from typing import Any
+
+from common import get_path
 
 
 class BuildingType:
@@ -60,7 +65,6 @@ class Building:
         self.__angle += angle
 
     def copy(self) -> Building:
-        print(self.pos)
         return Building(self.__info, self.pos, self.angle)
 
     @property
@@ -105,3 +109,38 @@ class Building:
 
     def __str__(self):
         return f"{'{'}name: '{self.name}', pos: {self.pos}, angle: {self.angle}{'}'}"
+
+
+class BuildingInformations:
+
+    def __init__(self, filepath:  str | PathLike[bytes]):
+        self.__building_types: dict[str, BuildingType] = dict()
+        self.__building_images: dict[str, list[pygame.Surface]] = dict()
+
+        with open(get_path(filepath), 'r') as file:
+            building_types = json.load(file)["buildings"]
+            for building in building_types:
+                self.__building_types[building["name"]] = BuildingType(
+                    building["name"],
+                    get_path("ressources/top/" + building["name"] + ".png"),
+                    building["size"]
+                )
+
+    def scale_building_images(self, resolution: int):
+        for building in self.__building_types.values():
+            scaled_image = building.get_scaled_image(resolution)
+            self.__building_images[building.name] = [
+                pygame.transform.rotate(scaled_image, angle)
+                for angle in (0, 90, 180, 270)
+            ]
+
+    def get_image(self, building: Building) -> pygame.Surface:
+        index = (building.angle % 360) // 90
+        return self.__building_images[building.name][index]
+
+    def get_image_from_name(self, typename: str, angle: int) -> pygame.Surface:
+        index = (angle % 360) // 90
+        return self.__building_images[typename][index]
+
+    def get_building_type(self, typename: str) -> BuildingType:
+        return self.__building_types[typename]
