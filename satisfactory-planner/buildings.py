@@ -5,7 +5,7 @@ from os import PathLike
 import pygame
 from typing import Any
 
-from common import get_path
+from common import get_path, Camera
 
 
 class BuildingType:
@@ -148,7 +148,9 @@ class BuildingInformations:
 
 class BuildingStorage:
 
-    def __init__(self):
+    def __init__(self, buildings_infos: BuildingInformations, camera: Camera):
+        self.__buildings_infos = buildings_infos
+        self.__camera = camera
         self.__buildings: set[Building] = set()
 
     def add(self, building: Building):
@@ -163,6 +165,16 @@ class BuildingStorage:
         for building in self.__buildings:
             if building.pos == pos:
                 return building
+
+    def draw(self, surface: pygame.Surface):
+        for building in self.__buildings:
+            building_image = self.__buildings_infos.get_image(building)
+
+            x_px, y_px = self.__camera.meter_to_px(*building.pos)[:2]
+            x_px -= building_image.get_width() / 2
+            y_px -= building_image.get_height() / 2
+
+            surface.blit(building_image, (x_px, y_px))
 
     def __iter__(self):
         return self.__buildings.__iter__()
