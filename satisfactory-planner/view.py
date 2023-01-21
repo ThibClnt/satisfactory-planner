@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import math
 import pygame
+from typing import Callable
 
 import settings
 from buildings import Building, BuildingInformations, BuildingStorage
-from common import trim, AppState
+from common import trim, AppState, Camera
 
 
 class ViewPort:
@@ -20,40 +20,31 @@ class ViewPort:
         self.__pos = pos
         self.__size = size
         self.__surface = pygame.Surface(size)
-        self.__x_offset, self.__y_offset = 0, 0
-        self.__resolution = settings.default_resolution  # px / m
         self.__show_floor = True
         self.__show_grid = False
 
-        # Load buildings data
-        self.__building_storage: BuildingStorage = BuildingStorage()
         self.__buildings_infos = BuildingInformations("data/buildings.json")
-        self.__buildings_infos.scale_building_images(self.__resolution)
+        self.__camera = Camera(self.__buildings_infos.scale_building_images)
+        self.__buildings_infos.scale_building_images(self.__camera.resolution)
+        self.__buildings: BuildingStorage = BuildingStorage(self.__buildings_infos, self.__camera)
 
         # Building selected in build mode
-        self.__current_building: Building = Building(self.__buildings_infos.get_building_type("conveyor"), (0, 0))
-
-        self.__conveyor_types = (
-            "conveyor", "conveyor-reduced", "conveyor-l-shaped", "conveyor-wave-left", "conveyor-wave-right"
-        )
-        self.__conveyor_index = 0
+        self.__build_overlay: BuildOverlay = BuildOverlay(self.__buildings_infos, "conveyor", self.__surface,
+                                                          self.__camera.meter_to_px)
 
     def process_events(self, events: list[pygame.event.Event]):
         def is_building_conveyor():
-            return "conveyor" in self.__current_building.name and self.__app_state.get() == AppState.BUILD
+            return "conveyor" in self.__build_overlay.building_type and self.__app_state.get() == AppState.BUILD
 
         keys_pressed = pygame.key.get_pressed()
 
         for event in events:
             if event.type == pygame.MOUSEMOTION:
                 if event.buttons[1] or (event.buttons[0] and keys_pressed[pygame.K_LCTRL]):
-                    self.__pan(event.rel)
+                    self.__camera.pan(event.rel)
 
             elif event.type == pygame.MOUSEWHEEL:
-                self.__zoom(event.y, pygame.mouse.get_pos())
-
-            elif event.type == pygame.MOUSEWHEEL and self.__app_state.get() == AppState.BUILD:
-                self.__rotate_selected(event.y)
+                self.__camera.zoom(event.y, pygame.mouse.get_pos())
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_g:  # show/hide grid
@@ -63,13 +54,13 @@ class ViewPort:
                     self.__show_floor = not self.__show_floor
 
                 elif (event.key == pygame.K_q or event.key == pygame.K_LEFT) and is_building_conveyor():
-                    self.__next_conveyor_type(-1)
+                    self.__build_overlay.next_conveyor_type(-1)
 
                 elif (event.key == pygame.K_d or event.key == pygame.K_RIGHT) and is_building_conveyor():
-                    self.__next_conveyor_type(1)
+                    self.__build_overlay.next_conveyor_type(1)
 
                 elif event.key == pygame.K_r and self.__app_state.get() == AppState.BUILD:
-                    self.__rotate_selected(-1 if keys_pressed[pygame.K_LSHIFT] else 1)
+                    self.__build_overlay.rotate(-1 if keys_pressed[pygame.K_LSHIFT] else 1)
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if (
@@ -78,50 +69,15 @@ class ViewPort:
                         and not keys_pressed[pygame.K_LCTRL]
                         and self.contains_coord(event.pos)
                 ):
-                    self.__place_building()
+                    self.__buildings.add(self.__build_overlay.create())
 
     def resize(self, size: tuple[int, int]):
         self.__size = size
         self.__surface = pygame.transform.scale(self.__surface, size)
 
-    def __pan(self, rel: tuple[int, int]):
-        self.__x_offset += rel[0]
-        self.__y_offset += rel[1]
-
-    def __zoom(self, amount: int, pos: tuple[int, int]):
-        xoff = self.__x_offset - pos[0]
-        yoff = self.__y_offset - pos[1]
-
-        if amount > 0 and self.resolution < 64:
-            self.resolution *= 2
-            xoff *= 2
-            yoff *= 2
-        elif amount < 0 and self.resolution > 4:
-            self.resolution = self.resolution // 2
-            xoff /= 2
-            yoff /= 2
-
-        self.__x_offset = int(xoff) + pos[0]
-        self.__y_offset = int(yoff) + pos[1]
-
-    def __rotate_selected(self, direction: int):
-        self.__current_building.rotate(-90 * direction)
-
-    def __place_building(self):
-        mouse_pos = self.get_view_coord(pygame.mouse.get_pos())
-        grid_pos = self.px_to_meter(*mouse_pos)[:2]
-
-        building = Building(
-            self.__buildings_infos.get_building_type(self.selected_building_name),
-            grid_pos,
-            self.__current_building.angle
-        )
-
-        self.__building_storage.add(building)
-
-    def __next_conveyor_type(self, direction: int):
-        self.__conveyor_index = (self.__conveyor_index + direction) % len(self.__conveyor_types)
-        self.selected_building_name = self.__conveyor_types[self.__conveyor_index]
+    def update(self):
+        grid_pos = self.__camera.px_to_meter(*self.get_view_coord(pygame.mouse.get_pos()))[:2]
+        self.__build_overlay.update_pos(grid_pos)
 
     def render(self, surface: pygame.Surface):
         self.__surface.fill(settings.background_color)
@@ -129,13 +85,13 @@ class ViewPort:
         if self.__show_floor:
             self.__draw_floor()
 
-        self.__draw_buildings()
+        self.__buildings.draw(self.__surface)
 
         if self.__show_grid:
             self.__draw_grid()
 
         if self.__app_state.get() == AppState.BUILD:
-            self.__draw_selected_building()
+            self.__build_overlay.draw(self.__surface)
 
         surface.blit(self.__surface, self.__pos)
 
@@ -145,47 +101,27 @@ class ViewPort:
         floor_width, floor_height = floor.get_width(), floor.get_height()  # floor image
         view_width, view_height = self.__size[0], self.__size[1]  # viewport
 
-        offset_x = self.__x_offset % floor_width - floor_width
-        offset_y = self.__y_offset % floor_height - floor_height
+        offset_x = self.__camera.x % floor_width - floor_width
+        offset_y = self.__camera.y % floor_height - floor_height
 
         for x in range(offset_x, view_width + 1, floor_width):
             for y in range(offset_y, view_height + 1, floor_height):
                 self.__surface.blit(floor, (x, y))
 
-    def __draw_buildings(self):
-        for building in self.__building_storage:
-            building_image = self.__buildings_infos.get_image(building)
-
-            x_px, y_px = self.meter_to_px(*building.pos)[:2]
-            x_px -= building_image.get_width() / 2
-            y_px -= building_image.get_height() / 2
-
-            self.__surface.blit(building_image, (x_px, y_px))
-
     def __draw_grid(self):
-        offset_x = self.__x_offset % self.__resolution
-        offset_y = self.__y_offset % self.__resolution
+        offset_x = self.__camera.x % self.__camera.resolution
+        offset_y = self.__camera.y % self.__camera.resolution
         view_width, view_height = self.__size[0], self.__size[1]
 
-        for x in range(offset_x, view_width + 1, self.__resolution):
-            from_pos = (x, offset_y - self.__resolution)
+        for x in range(offset_x, view_width + 1, self.__camera.resolution):
+            from_pos = (x, offset_y - self.__camera.resolution)
             to_pos = (x, offset_y + view_height)
             pygame.draw.line(self.__surface, settings.grid_color, from_pos, to_pos)
 
-        for y in range(offset_y, view_height + 1, self.__resolution):
-            from_pos = (offset_x - self.__resolution, y)
+        for y in range(offset_y, view_height + 1, self.__camera.resolution):
+            from_pos = (offset_x - self.__camera.resolution, y)
             to_pos = (offset_x + view_width, y)
             pygame.draw.line(self.__surface, settings.grid_color, from_pos, to_pos)
-
-    def __draw_selected_building(self):
-        building_image = self.__buildings_infos.get_image(self.__current_building)
-        grid_pos = self.px_to_meter(*self.get_view_coord(pygame.mouse.get_pos()))
-
-        x_px, y_px = self.meter_to_px(*grid_pos)[:2]
-        x_px -= building_image.get_width() / 2
-        y_px -= building_image.get_height() / 2
-
-        self.__surface.blit(building_image, (x_px, y_px))
 
     def get_view_coord(self, pos: tuple[int, int]) -> tuple[int, int]:
         """
@@ -200,55 +136,57 @@ class ViewPort:
         x, y = pos
         return 0 < x < self.__size[0] and 0 < y - settings.control_bar_size < self.__size[1]
 
-    def meter_to_px(self, x: int, y: int, w: int = 0, h: int = 0) -> tuple[int, int, int, int]:
-        """
-        :param x: x pos in meter
-        :param y: y pos in meter
-        :param w: width in meter
-        :param h: height in meter
-        :return: (x, y, w, h) in px
-        """
-        return (1 + x * self.__resolution + self.__x_offset,
-                1 + y * self.__resolution + self.__y_offset,
-                w * self.__resolution - 1,
-                h * self.__resolution - 1)
+    @property
+    def build_overlay(self) -> BuildOverlay:
+        return self.__build_overlay
 
-    def px_to_meter(self, x: int, y: int, w: int = 0, h: int = 0) -> tuple[int, int, int, int]:
-        """
-        :param x: x pos in px
-        :param y: y pos in px
-        :param w: width in px
-        :param h: height in px
-        :return: (x, y, w, h) in meters
-        """
-        nx = int((x - 1 - self.__x_offset) / self.__resolution)
-        ny = int((y - 1 - self.__y_offset) / self.__resolution)
 
-        nx -= 1 if nx < 0 else 0
-        ny -= 1 if ny < 0 else 0
+class BuildOverlay:
 
-        return (nx,
-                ny,
-                int((w + 1) / self.__resolution),
-                int((h + 1) / self.__resolution))
+    def __init__(self,
+                 buildings_infos: BuildingInformations,
+                 default: str,
+                 surface: pygame.Surface,
+                 to_px_function: Callable[[int, int, int, int], tuple[int, int, int, int]]
+                 ):
+        self.__buildings_infos = buildings_infos
+        self.__building = Building(buildings_infos.get_building_type(default), (0, 0))
+        self.__surface = surface
+        self.__func = to_px_function
+
+        self.__conveyor_types = (
+            "conveyor", "conveyor-reduced", "conveyor-l-shaped", "conveyor-wave-left", "conveyor-wave-right"
+        )
+        self.__conveyor_index = 0
+
+    def rotate(self, direction: int):
+        self.__building.rotate(-90 * direction)
+
+    def update_pos(self, pos: tuple[int, int]):
+        self.__building.pos = pos
+
+    def draw(self, surface: pygame.Surface):
+        image = self.__buildings_infos.get_image(self.__building)
+
+        x_px, y_px = self.__func(*self.__building.pos)[:2]
+        x_px -= image.get_width() / 2
+        y_px -= image.get_height() / 2
+
+        surface.blit(image, (x_px, y_px))
+
+    def create(self):
+        return self.__building.copy()
+
+    def next_conveyor_type(self, direction: int):
+        self.__conveyor_index = (self.__conveyor_index + direction) % len(self.__conveyor_types)
+        self.building_type = self.__conveyor_types[self.__conveyor_index]
 
     @property
-    def resolution(self) -> int:
-        return self.__resolution
+    def building_type(self) -> str:
+        return self.__building.name
 
-    @resolution.setter
-    def resolution(self, r: int):
-        # Ensure r is a power of two
-        r = 2 ** (int(math.log2(r)))
-
-        self.__resolution = r
-        self.__buildings_infos.scale_building_images(r)
-
-    @property
-    def selected_building_name(self) -> str:
-        return self.__current_building.name
-
-    @selected_building_name.setter
-    def selected_building_name(self, building_name: str):
-        angle = self.__current_building.angle
-        self.__current_building = Building(self.__buildings_infos.get_building_type(building_name), (0, 0), angle)
+    @building_type.setter
+    def building_type(self, typename: str):
+        self.__building = Building(self.__buildings_infos.get_building_type(typename),
+                                   self.__building.pos,
+                                   self.__building.angle)

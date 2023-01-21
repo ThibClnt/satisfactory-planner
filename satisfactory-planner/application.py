@@ -5,7 +5,7 @@ import pygame
 import settings
 from common import get_path, AppState
 from ui import ImageButton, ShortcutButton
-from view import ViewPort
+from view import ViewPort, BuildOverlay
 
 
 class Application:
@@ -18,12 +18,14 @@ class Application:
         self.__state = AppState()
 
         self.__controlbar = ControlBar(self, (size[0], settings.control_bar_size), settings.control_bar_color)
-        self.__hotbar = HotBar(self, self.__state, HotBar.calculate_center_pos(size[0], settings.control_bar_size))
         self.__viewport = ViewPort(self.__state, (0, settings.control_bar_size), size)
+        self.__hotbar = HotBar(self.__viewport.build_overlay, self.__state,
+                               HotBar.calculate_center_pos(size[0], settings.control_bar_size))
 
     def loop(self):
         while self.__running:
             self.process_events()
+            self.update()
             self.render()
 
     def process_events(self):
@@ -56,6 +58,9 @@ class Application:
     def __set_idle(self):
         self.__state.set(AppState.IDLE)
         self.__hotbar.loose_focus()
+
+    def update(self):
+        self.__viewport.update()
 
     def render(self):
         self.__screen.fill((0, 0, 0))
@@ -119,8 +124,8 @@ class HotBar:
 
         return x, y
 
-    def __init__(self, application: Application, app_state: AppState, pos: tuple[int, int]):
-        self.__application = application    # TODO Shift link to overlay
+    def __init__(self, build_overlay: BuildOverlay, app_state: AppState, pos: tuple[int, int]):
+        self.__build_overlay = build_overlay
         self.__app_state = app_state
         self.__x, self.__y = pos
 
@@ -167,7 +172,7 @@ class HotBar:
 
         # Change mode and current building
         button_index = (button_index + 1) % len(self.shortcuts_properties.keys())
-        self.__application.viewport.selected_building_name = self.shortcuts_properties[button_index][2]
+        self.__build_overlay.building_type = self.shortcuts_properties[button_index][2]
         self.__app_state.set(AppState.BUILD)
 
     def loose_focus(self):
