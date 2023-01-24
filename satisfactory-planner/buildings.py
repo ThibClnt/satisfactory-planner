@@ -4,6 +4,7 @@ import json
 from os import PathLike
 import pygame
 from typing import Any
+from abc import ABCMeta, abstractmethod
 
 from common import get_path, Camera
 
@@ -53,23 +54,23 @@ class BuildingType:
 
 class Building:
 
-    def __init__(self, info: BuildingType, pos: tuple[int, int], angle: int = 0):
-        self.__info = info
+    def __init__(self, type_: BuildingType, pos: tuple[int, int], angle: int = 0):
+        self.__type = type_
         self.__x, self.__y = pos
         self.__angle = angle
 
     def get_scaled_image(self, resolution: int) -> pygame.Surface:
-        return pygame.transform.rotate(self.__info.get_scaled_image(resolution), self.__angle).convert_alpha()
+        return pygame.transform.rotate(self.__type.get_scaled_image(resolution), self.__angle).convert_alpha()
 
     def rotate(self, angle: int):
         self.__angle += angle
 
     def copy(self) -> Building:
-        return Building(self.__info, self.pos, self.angle)
+        return Building(self.__type, self.pos, self.angle)
 
     @property
     def name(self):
-        return self.__info.name
+        return self.__type.name
 
     @property
     def pos(self) -> tuple[int, int]:
@@ -89,15 +90,15 @@ class Building:
 
     @property
     def width(self) -> int:
-        return self.__info.width
+        return self.__type.width
 
     @property
     def height(self) -> int:
-        return self.__info.height
+        return self.__type.height
 
     @property
     def size(self) -> tuple[int, int]:
-        return self.__info.width, self.__info.height
+        return self.__type.width, self.__type.height
 
     @property
     def angle(self) -> int:
@@ -105,7 +106,11 @@ class Building:
 
     @property
     def image(self) -> pygame.Surface:
-        return self.__info.image
+        return self.__type.image
+
+    @property
+    def type(self):
+        return self.__type
 
     def __str__(self):
         return f"{'{'}name: '{self.name}', pos: {self.pos}, angle: {self.angle}{'}'}"
@@ -147,19 +152,58 @@ class BuildingInformations:
 
 
 class BuildingStorage:
+    __max_history_capacity = 64
 
     def __init__(self, buildings_infos: BuildingInformations, camera: Camera):
         self.__buildings_infos = buildings_infos
         self.__camera = camera
         self.__buildings: set[Building] = set()
+        self.__past: list[Action] = []      # Stack
+        self.__future: list[Action] = []    # Stack
 
-    def add(self, building: Building):
-        if self.get(building.pos) is not None:
-            return
+    def add(self, building: Building, from_history: bool = False):
+        if not from_history:
+            self.__future.clear()
+
         self.__buildings.add(building)
 
-    def remove(self, building: Building):
+        if not from_history:
+            self.__add_to_past(AddAction(building))
+
+    def remove(self, building: Building, from_history: bool = False):
+        if not from_history:
+            self.__future.clear()
+
         self.__buildings.remove(building)
+
+        if not from_history:
+            self.__add_to_past(RemoveAction(building))
+
+    def undo(self):
+        if len(self.__past) == 0:
+            return
+
+        last: Action = self.__past.pop()
+        last.undo_action(self)
+        self.__add_to_future(last)
+
+    def redo(self):
+        if len(self.__future) == 0:
+            return
+
+        following: Action = self.__future.pop()
+        following.redo_action(self)
+        self.__add_to_past(following)
+
+    def __add_to_past(self, action: Action):
+        if len(self.__past) >= self.__max_history_capacity:
+            self.__past.pop(0)
+        self.__past.append(action)
+
+    def __add_to_future(self, action: Action):
+        if len(self.__future) >= self.__max_history_capacity:
+            self.__future.pop(0)
+        self.__future.append(action)
 
     def get(self, pos: tuple[int, int]) -> Building:
         for building in self.__buildings:
@@ -178,3 +222,39 @@ class BuildingStorage:
 
     def __iter__(self):
         return self.__buildings.__iter__()
+
+
+class Action(metaclass=ABCMeta):
+
+    def __init__(self, building: Building):
+        self.__building: Building = building
+
+    @abstractmethod
+    def undo_action(self, storage: BuildingStorage):
+        pass
+
+    @abstractmethod
+    def redo_action(self, storage: BuildingStorage):
+        pass
+
+    @property
+    def building(self) -> Building:
+        return self.__building
+
+
+class AddAction(Action):
+
+    def undo_action(self, storage: BuildingStorage):
+        storage.remove(self.building, True)
+
+    def redo_action(self, storage: BuildingStorage):
+        storage.add(self.building, True)
+
+
+class RemoveAction(Action):
+
+    def undo_action(self, storage: BuildingStorage):
+        storage.add(self.building, True)
+
+    def redo_action(self, storage: BuildingStorage):
+        storage.remove(self.building, True)

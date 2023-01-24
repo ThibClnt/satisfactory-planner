@@ -62,6 +62,12 @@ class ViewPort:
                 elif event.key == pygame.K_r and self.__app_state.get() == AppState.BUILD:
                     self.__build_overlay.rotate(-1 if keys_pressed[pygame.K_LSHIFT] else 1)
 
+                elif event.key == pygame.K_z and keys_pressed[pygame.K_LCTRL]:
+                    self.__buildings.undo()
+
+                elif event.key == pygame.K_y and keys_pressed[pygame.K_LCTRL]:
+                    self.__buildings.redo()
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if (
                         event.button == 1
@@ -187,6 +193,5 @@ class BuildOverlay:
 
     @building_type.setter
     def building_type(self, typename: str):
-        self.__building = Building(self.__buildings_infos.get_building_type(typename),
-                                   self.__building.pos,
+        self.__building = Building(self.__buildings_infos.get_building_type(typename), self.__building.pos,
                                    self.__building.angle)
